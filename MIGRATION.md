@@ -39,7 +39,9 @@ package `opentamizh`. It now builds the **TamilScript** project and the
   ids are registered as aliases on activation.
 - Historical changelog entries are intentionally preserved verbatim, with a
   rename note added above them. They describe releases made under the old
-  name.
+  name. Feature annotations like `(v0.2.0)` in docs and comments refer to
+  those pre-rename development milestones; the first release under the
+  `tamilscript` name is `0.1.0`.
 - The new package exposes **only** the `tamilscript` executable. There is no
   legacy `opentamizh` bin alias: update npm scripts and shell aliases to the
   new command. The separately published `opentamizh` package is untouched.

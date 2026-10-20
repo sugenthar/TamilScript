@@ -23,7 +23,9 @@ npx -y tamilscript run hello.js
 > `tamilscript` is not yet published on the public npm registry. Until it is,
 > install the packed tarball locally as shown under [Installation](#installation);
 > after publication the command above works unchanged. TamilScript was
-> previously named **OpenTamizh**; see [MIGRATION.md](MIGRATION.md).
+> previously named **OpenTamizh**; see [MIGRATION.md](MIGRATION.md). Feature
+> annotations like `(v0.2.0)` refer to pre-rename development milestones; the
+> version of this package is `0.1.0`.
 
 > Custom TamilScript syntax (`$` literals) must be executed through `npx -y tamilscript run hello.js`, not directly through `node hello.js` — plain Node.js cannot parse `$` literals. To get a plain-JS file, transform first: `npx -y tamilscript transform hello.js -o hello.out.js` produces output that runs under `node` directly (when the program mentions `அச்சிடு()`, the output carries a small inlined runtime prelude, so no import or install is needed). Programs that avoid `$` literals (Tamil identifiers plus an explicit `tamilscript/runtime` import) also run under plain `node` unchanged; see [examples/print-explicit.js](examples/print-explicit.js).
 

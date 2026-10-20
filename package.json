@@ -61,5 +61,13 @@
     "bench": "node bench/bench.js",
     "bench:quick": "node bench/bench.js --quick"
   },
-  "author": "TamilScript contributors"
+  "author": "TamilScript contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sugenthar/TamilScript.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sugenthar/TamilScript/issues"
+  },
+  "homepage": "https://github.com/sugenthar/TamilScript#readme"
 }

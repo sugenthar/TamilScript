@@ -206,7 +206,14 @@ describe('run command', () => {
     } else {
       assert.equal(r.ok, true, r.error);
       assert.equal(vscode.terminals.length, 1);
-      assert.match(vscode.terminals[0].sent[0].text, /'\$\(calc\)\.js'/);
+      // The WHOLE path must be single-quoted as one POSIX argument: quoting
+      // only the basename would leave `$(calc)` expandable by the shell.
+      // (The Windows branch refuses such paths instead; see quoteArg.)
+      const quoted = `'${special.split("'").join(`'\\''`)}'`;
+      assert.ok(
+        vscode.terminals[0].sent[0].text.includes(quoted),
+        `expected the full path to be quoted: ${vscode.terminals[0].sent[0].text}`
+      );
     }
   });
 
