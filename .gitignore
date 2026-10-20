@@ -1,0 +1,10 @@
+node_modules/
+*.log
+*.vsix
+.DS_Store
+Thumbs.db
+tamilscript-*.tgz
+opentamizh-*.tgz
+jstamil-*.tgz
+*.out.js
+coverage/

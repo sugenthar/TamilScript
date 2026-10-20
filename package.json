@@ -1,0 +1,65 @@
+{
+  "name": "tamilscript",
+  "version": "0.1.0",
+  "description": "TamilScript: a Tamil-friendly JavaScript source transformer for Node.js, with Tamil numeric literals and Tamil identifiers.",
+  "keywords": [
+    "tamilscript",
+    "tamil",
+    "tamil-numerals",
+    "javascript",
+    "nodejs",
+    "compiler",
+    "transpiler",
+    "lexer",
+    "transformer",
+    "npm",
+    "language-tools"
+  ],
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "require": "./src/index.js",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    },
+    "./runtime": {
+      "types": "./src/runtime.d.ts",
+      "require": "./src/runtime.js",
+      "import": "./src/runtime.js",
+      "default": "./src/runtime.js"
+    },
+    "./register": {
+      "require": "./src/register.js",
+      "import": "./src/register.js",
+      "default": "./src/register.js"
+    }
+  },
+  "bin": {
+    "tamilscript": "bin/tamilscript.js"
+  },
+  "files": [
+    "src/",
+    "bin/",
+    "README.md",
+    "CHANGELOG.md",
+    "MIGRATION.md",
+    "LICENSE",
+    "docs/",
+    "examples/"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "node scripts/run-tests.js",
+    "test:unit": "node --test test/numerals.test.js test/numerals-decimal.test.js test/decimals.test.js test/transformer.test.js test/lexical-contexts.test.js test/diagnostics.test.js test/sourcemaps.test.js test/api.test.js test/api-stability.test.js test/edge-cases.test.js test/scaffold.test.js test/esm-exports.test.js test/repl.test.js test/format.test.js test/lint.test.js test/run-tests-script.test.js",
+    "test:cli": "node --test test/cli.test.js test/esm.test.js test/commonjs.test.js test/imports.test.js test/hardening.test.js test/examples.test.js test/print-helper.test.js test/diagnostics-cli.test.js test/cli-init.test.js test/cli-advanced.test.js test/debugging.test.js test/color-output.test.js test/standalone.test.js",
+    "bench": "node bench/bench.js",
+    "bench:quick": "node bench/bench.js --quick"
+  },
+  "author": "TamilScript contributors"
+}

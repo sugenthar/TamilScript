@@ -1,0 +1,49 @@
+{
+  "Tamil integer literal": {
+    "prefix": "otint",
+    "body": "\\$${1:\u0BE7\u0BEE}",
+    "description": "Insert a Tamil integer literal (renders 18)."
+  },
+  "Tamil decimal literal": {
+    "prefix": "otdec",
+    "body": "\\$${1:\u0BE7\u0BE8}.${2:\u0BEB}",
+    "description": "Insert a Tamil decimal literal (renders 12.5)."
+  },
+  "Variable with Tamil literal": {
+    "prefix": "otvar",
+    "body": "let ${1:name} = \\$${2:\u0BE7\u0BEE};",
+    "description": "Declare a variable initialized with a Tamil integer literal."
+  },
+  "Function using Tamil literals": {
+    "prefix": "otfunc",
+    "body": [
+      "function ${1:add}(a, b) {",
+      "\treturn a + b + \\$${2:\u0BE7\u0BEE};",
+      "}"
+    ],
+    "description": "Small function body that adds a Tamil integer literal."
+  },
+  "Runnable TamilScript example": {
+    "prefix": "otexample",
+    "body": [
+      "let ${1:age} = \\$${2:\u0BE7\u0BEE};",
+      "console.log(${1:age});"
+    ],
+    "description": "Minimal runnable TamilScript program. Run with: tamilscript run <file>."
+  },
+  "Tamil print statement": {
+    "prefix": "otprint",
+    "body": "அச்சிடு(${1:value});",
+    "description": "Print values with the Tamil print helper (same formatting as console.log)."
+  },
+  "Explicit runtime import (CommonJS)": {
+    "prefix": "otrequire",
+    "body": "const { அச்சிடு } = require(\"tamilscript/runtime\");",
+    "description": "Import the Tamil print helper explicitly for plain node, editors, and bundlers."
+  },
+  "Explicit runtime import (ESM)": {
+    "prefix": "otimport",
+    "body": "import { அச்சிடு } from \"tamilscript/runtime\";",
+    "description": "Import the Tamil print helper explicitly for ESM programs."
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "scopeName": "tamilscript.injection",
+  "injectionSelector": "L:source.js -comment -string, L:source.js.jsx -comment -string, L:source.tamilscript -comment -string",
+  "patterns": [
+    {
+      "name": "invalid.illegal.tamilscript",
+      "match": "(?<![A-Za-z0-9_$\u0080-\uFFFF])\\$[\"']"
+    },
+    {
+      "name": "invalid.illegal.tamilscript",
+      "match": "(?<![A-Za-z0-9_$\u0080-\uFFFF])\\$[\u0BE6-\u0BEF]+(?:\\.[\u0BE6-\u0BEF]+)?n\\b"
+    },
+    {
+      "name": "invalid.illegal.tamilscript",
+      "match": "(?<![A-Za-z0-9_$\u0080-\uFFFF])\\$[\u0BE6-\u0BEF]+\\.[0-9]+"
+    },
+    {
+      "name": "invalid.illegal.tamilscript",
+      "match": "(?<![A-Za-z0-9_$\u0080-\uFFFF])\\$[\u0BE6-\u0BEF]+[A-Za-z_$0-9\u0080-\u0BE5\u0BF0-\uFFFF]"
+    },
+    {
+      "name": "invalid.illegal.tamilscript",
+      "match": "(?<![A-Za-z0-9_$\u0080-\uFFFF])\\$[\u0BE6-\u0BEF]+\\.[\u0BE6-\u0BEF]+\\.[\u0BE6-\u0BEF]+"
+    },
+    {
+      "name": "invalid.illegal.tamilscript",
+      "match": "(?<![A-Za-z0-9_$\u0080-\uFFFF])\\$[\u0BE6-\u0BEF]+\\.\\$[\u0BE6-\u0BEF]+"
+    },
+    {
+      "name": "invalid.illegal.tamilscript",
+      "match": "(?<![A-Za-z0-9_$\u0080-\uFFFF])\\$[\u0BE6-\u0BEF]+\\.[\u0BE6-\u0BEF]+\\.\\$[\u0BE6-\u0BEF]+"
+    },
+    {
+      "name": "invalid.illegal.tamilscript",
+      "match": "(?<![A-Za-z0-9_$\u0080-\uFFFF])\\$[\u0BE6-\u0BEF]+\\.[\u0BE6-\u0BEF]+[A-Za-z_$0-9\u0080-\u0BE5\u0BF0-\uFFFF]"
+    },
+    {
+      "name": "invalid.illegal.tamilscript",
+      "match": "(?<![A-Za-z0-9_$\u0080-\uFFFF])\\$[\u0BE6-\u0BEF]+\\.[\u0BE6-\u0BEF]+\\.(?![A-Za-z_$\u0080-\uFFFF\\s/\\\\])"
+    },
+    {
+      "name": "invalid.illegal.tamilscript",
+      "match": "(?<![A-Za-z0-9_$\u0080-\uFFFF])\\$\\$[\u0BE6-\u0BEF]+"
+    },
+    {
+      "name": "constant.numeric.tamilscript",
+      "match": "(?<![A-Za-z0-9_$\u0080-\uFFFF])(\\$)([\u0BE6-\u0BEF]+\\.[\u0BE6-\u0BEF]+)",
+      "captures": {
+        "1": { "name": "punctuation.definition.tamilscript" }
+      }
+    },
+    {
+      "name": "constant.numeric.tamilscript",
+      "match": "(?<![A-Za-z0-9_$\u0080-\uFFFF])(\\$)([\u0BE6-\u0BEF]+)",
+      "captures": {
+        "1": { "name": "punctuation.definition.tamilscript" }
+      }
+    }
+  ]
+}

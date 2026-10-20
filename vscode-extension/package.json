@@ -1,0 +1,120 @@
+{
+  "name": "tamilscript-vscode",
+  "displayName": "TamilScript",
+  "description": "Tamil numeric literals and Tamil identifiers in JavaScript: highlighting, snippets, diagnostics, and transform commands. Powered by the tamilscript core transformer.",
+  "version": "0.3.0",
+  "publisher": "opentamizh",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Linters"
+  ],
+  "keywords": [
+    "tamilscript",
+    "tamil",
+    "javascript",
+    "diagnostics"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:tamilscript",
+    "onCommand:tamilscript.checkFile",
+    "onCommand:tamilscript.transformFile",
+    "onCommand:tamilscript.runFile",
+    "onCommand:tamilscript.showVersion",
+    "onCommand:tamilscript.setLanguageMode",
+    "onCommand:opentamizh.checkFile",
+    "onCommand:opentamizh.transformFile",
+    "onCommand:opentamizh.runFile",
+    "onCommand:opentamizh.showVersion",
+    "onCommand:opentamizh.setLanguageMode"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "tamilscript",
+        "aliases": ["TamilScript", "tamilscript"],
+        "extensions": [".ot.js"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "tamilscript",
+        "scopeName": "source.tamilscript",
+        "path": "./syntaxes/tamilscript.tmLanguage.json"
+      },
+      {
+        "scopeName": "tamilscript.injection",
+        "path": "./syntaxes/tamilscript.injection.tmLanguage.json",
+        "injectTo": ["source.js", "source.js.jsx", "source.tamilscript"]
+      }
+    ],
+    "snippets": [
+      {
+        "language": "javascript",
+        "path": "./snippets/tamilscript.json"
+      },
+      {
+        "language": "tamilscript",
+        "path": "./snippets/tamilscript.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "tamilscript.checkFile",
+        "title": "TamilScript: Check Current File"
+      },
+      {
+        "command": "tamilscript.transformFile",
+        "title": "TamilScript: Transform Current File"
+      },
+      {
+        "command": "tamilscript.runFile",
+        "title": "TamilScript: Run Current File"
+      },
+      {
+        "command": "tamilscript.showVersion",
+        "title": "TamilScript: Show Version"
+      },
+      {
+        "command": "tamilscript.setLanguageMode",
+        "title": "TamilScript: Use TamilScript Language Mode"
+      }
+    ],
+    "configuration": {
+      "title": "TamilScript",
+      "properties": {
+        "tamilscript.enableDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Validate TamilScript files on open, save, and edit using the core transformer (never executes code)."
+        },
+        "tamilscript.debounceMs": {
+          "type": "number",
+          "default": 300,
+          "description": "Delay in milliseconds before re-validating after an edit."
+        },
+        "tamilscript.corePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional explicit path to the tamilscript package or its src/index.js. Empty means auto-detect (workspace node_modules, then the bundled core checkout)."
+        },
+        "tamilscript.autoLanguageMode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically switch documents that contain TamilScript literals (saved files, unsaved buffers, and remote or virtual workspaces) to the TamilScript language mode, where the built-in JavaScript validator does not flag valid Tamil literals as syntax errors. Ordinary JavaScript documents are never switched, file contents are never touched, and switching a document back to JavaScript is respected for the session."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node ../scripts/run-tests.js",
+    "test:integration": "node integration/launch.js"
+  }
+}
