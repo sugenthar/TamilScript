@@ -8,3 +8,4 @@ opentamizh-*.tgz
 jstamil-*.tgz
 *.out.js
 coverage/
+audit-tmp/
