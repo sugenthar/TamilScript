@@ -37,6 +37,7 @@ export declare const ErrorCodes: {
   readonly UNTERMINATED_REGEX: 'JST_UNTERMINATED_REGEX';
   readonly UNTERMINATED_TEMPLATE_EXPR: 'JST_UNTERMINATED_TEMPLATE_EXPR';
   readonly INVALID_NUMERAL_INPUT: 'JST_INVALID_NUMERAL';
+  readonly JAVASCRIPT_SYNTAX: 'JST_JAVASCRIPT_SYNTAX';
   readonly READ_ERROR: 'JST_READ_ERROR';
   readonly WRITE_ERROR: 'JST_WRITE_ERROR';
 };
@@ -54,10 +55,16 @@ export function toTamilDecimal(n: number): string;
  */
 export declare const அச்சிடு: (...args: any[]) => void;
 
-export function transform(source: string, options?: { filename?: string }): string;
+export interface TransformOptions {
+  filename?: string;
+  /** Opt in to Tamil keyword aliases; ordinary identifiers are unchanged by default. */
+  tamilKeywords?: boolean;
+}
+
+export function transform(source: string, options?: TransformOptions): string;
 
 export interface TransformEvent {
-  type: 'number' | 'decimal';
+  type: 'number' | 'decimal' | 'keyword' | 'range';
   line: number;
   column: number;
   text: string;
@@ -91,7 +98,7 @@ export interface PositionAnchor {
 
 export function transformWithMap(
   source: string,
-  options?: { filename?: string }
+  options?: TransformOptions
 ): {
   code: string;
   map: SourceMap;
@@ -102,7 +109,7 @@ export function transformWithMap(
 
 export function transformWithMeta(
   source: string,
-  options?: { filename?: string }
+  options?: TransformOptions
 ): { code: string; events: TransformEvent[] };
 
 export function inlineSourceMapComment(map: SourceMap): string;
@@ -116,16 +123,37 @@ export function inlineSourceMapComment(map: SourceMap): string;
 export function transformFile(
   inputPath: string,
   outputPath?: string,
-  options?: { force?: boolean }
+  options?: { force?: boolean; tamilKeywords?: boolean }
 ): Promise<string>;
 
 export function runFile(
   filePath: string,
   extraArgs?: string[],
-  options?: { nodeFlags?: string[] }
+  options?: { nodeFlags?: string[]; tamilKeywords?: boolean }
 ): Promise<number>;
 
-export function checkFile(filePath: string): Promise<{ ok: boolean; errors: string[] }>;
+export function checkFile(
+  filePath: string,
+  options?: { tamilKeywords?: boolean }
+): Promise<{ ok: boolean; errors: string[] }>;
+
+export interface ValidationDiagnostic {
+  line: number;
+  column: number;
+  message: string;
+  code: string | null;
+  name: string;
+}
+
+/**
+ * Syntax-only validation of TamilScript source without executing it.
+ * Chosen line/column are 1-based. This does not check identifiers, types,
+ * imports, or other semantic properties.
+ */
+export function validate(
+  source: string,
+  options?: TransformOptions
+): { ok: true; code: string } | { ok: false; diagnostic: ValidationDiagnostic };
 
 export const VERSION: string;
 export const errors: {

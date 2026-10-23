@@ -5,13 +5,14 @@
 > constructors, so either name works with `instanceof`. Import from
 > `"tamilscript"`.
 
-All entry points are exported from the package root and work with both
-`require("tamilscript")` and `import ... from "tamilscript"`.
+Core entry points are exported from the package root and work with both
+`require("tamilscript")` and `import ... from "tamilscript"`. Explicit runtime
+helpers live in `tamilscript/runtime` (see [Runtime helpers](#runtime-helpers-tamilscriptruntime)).
 
 ```js
-const { toNumber, toTamilNumerals, transform, transformFile } = require("tamilscript");
+const { toNumber, toTamilNumerals, transform, transformFile, validate } = require("tamilscript");
 // or:
-import { toNumber, toTamilNumerals, transform, transformFile } from "tamilscript";
+import { toNumber, toTamilNumerals, transform, transformFile, validate } from "tamilscript";
 ```
 
 ## toNumber(input)
@@ -49,7 +50,7 @@ toTamilNumerals(0);   // "௦"
   `Number.MAX_SAFE_INTEGER` throw `RangeError`. Negation is the caller's
   job (`"-" + toTamilNumerals(18)` or the unary minus operator in code).
 
-## parseTamilDecimal(input) — new in v0.2.0
+## parseTamilDecimal(input)
 
 Convert a Tamil decimal string to a JavaScript `Number`.
 
@@ -63,7 +64,7 @@ parseTamilDecimal("$௦.௧௮"); // 0.18
 - Result follows IEEE 754 semantics exactly (same as parsing the ASCII
   equivalent: `parseTamilDecimal("௧.௧") === 1.1`).
 
-## toTamilDecimal(n) — new in v0.2.0
+## toTamilDecimal(n)
 
 Convert a non-negative finite number to a Tamil decimal string.
 
@@ -87,6 +88,8 @@ transform("let age = $௧௮;"); // "let age = 18;"
 
 - `source: string` (required). Non-strings throw `TypeError`.
 - `options.filename?: string` — used only in error messages.
+- `options.tamilKeywords?: boolean` — opt in to the documented Tamil keyword
+  aliases (default `false`). Ranges are numeric literals and need no opt-in.
 - Returns the transformed `string` (plain JavaScript for Node.js).
 - Pure transformation: no runtime code is added. When the source mentions
   the Tamil print helper (`அச்சிடு`), the file APIs below and the `transform`
@@ -99,8 +102,12 @@ transform("let age = $௧௮;"); // "let age = 18;"
   template text pass through untouched.
 - Ordinary identifiers pass through verbatim — including the Tamil print
   helper name, which is why `tamilscript/runtime` programs transform cleanly.
+  With `tamilKeywords: true`, only the implemented words in
+  [SYNTAX.md](SYNTAX.md#41-tamil-keywords-opt-in) are rewritten.
+  Property names after `.`/`#`, object keys, and ordinary class/object member
+  names keep their spelling.
 
-## transformWithMap(source, options?) — new in v0.2.0
+## transformWithMap(source, options?)
 
 Transform and return a Source Map v3 object alongside the code.
 
@@ -111,9 +118,11 @@ const { code, map } = transformWithMap(src, { filename: "prog.js" });
 
 Line-accurate everywhere; column-accurate outside replaced literal spans
 (columns snap to literal boundaries on other lines, as with most maps).
-`options.filename` is recorded in `map.sources`.
+`options.filename` is recorded in `map.sources`; `options.tamilKeywords`
+enables keyword aliases. Keyword and range replacements are recorded just
+like numeric literals in the map.
 
-## transformWithMeta(source, options?) — new in v0.2.0
+## transformWithMeta(source, options?)
 
 Transform and list the replaced custom literals (powers
 `tamilscript transform --explain`).
@@ -121,10 +130,19 @@ Transform and list the replaced custom literals (powers
 ```js
 const { code, events } = transformWithMeta('let a = $௧.௫;');
 // events: [{ type: "decimal", line: 1, column: 9, text: "$௧.௫", value: "1.5" }]
+
+transformWithMeta('என்றால் (true) {}', { tamilKeywords: true }).events;
+// [{ type: "keyword", line: 1, column: 1, text: "என்றால்", value: "if" }]
+
+transformWithMeta('const a = $௧..$௩;').events;
+// [{ type: "range", line: 1, column: 11, text: "$௧..$௩",
+//    value: "(() => { const values = []; for (let i = 0; i < 3; i++) values[i] = 1 + i; return values; })()" }]
 ```
 
 Event collection is strictly opt-in: plain `transform()` never records
-source snippets.
+source snippets. `type` is one of `"number"`, `"decimal"`, `"range"`, or
+`"keyword"`; `text` is the original source span and `value` is the emitted
+replacement.
 
 ## transformFile(inputPath, outputPath?, options?)
 
@@ -143,6 +161,8 @@ await transformFile("a.js", "a.js", { force: true });            // explicit ove
   leaves a half-written output).
 - Same-file input/output without `{ force: true }` throws.
 - Empty/non-string paths throw `TypeError`.
+- `options.tamilKeywords` opts in to Tamil keyword aliases; it is off by
+  default and applies to every file transformed by the call.
 - `transformFile` is the file variant of `transform()` and is what the
   `transform` CLI uses. Standalone output: when the source mentions the
   Tamil print helper (`அச்சிடு`), the returned and written code starts with
@@ -159,17 +179,20 @@ await transformFile("a.js", "a.js", { force: true });            // explicit ove
 
 ## runFile / checkFile (also exported)
 
-- `runFile(file, args?) -> Promise<exitCode>`: transform (including
-  relative JS dependencies), execute via a child `node` process with
-  `--enable-source-maps` and inline maps, forward stdio/args/exit codes,
-  clean up temp files. When the program mentions the Tamil print helper,
-  the child additionally loads it via `node --import` (see below).
-- `checkFile(file) -> Promise<{ ok, errors }>`: transform and run
+- `runFile(file, args?, options?) -> Promise<exitCode>`: transform
+  (including relative JS dependencies), execute via a child `node` process
+  with `--enable-source-maps` and inline maps, forward stdio/args/exit codes,
+  clean up temp files. `options.tamilKeywords` opts in to keyword aliases and
+  is propagated to the dependency tree. When the program mentions the Tamil
+  print helper, the child additionally loads it via `node --import` (see
+  below).
+- `checkFile(file, options?) -> Promise<{ ok, errors }>`: transform and run
   `node --check` over the transformed program incl. dependencies.
-  `errors` are formatted multi-line diagnostics (see below). Missing files
-  yield `{ ok: false, errors }` instead of throwing.
+  `options.tamilKeywords` is propagated the same way. `errors` are formatted
+  multi-line diagnostics (see below). Missing files yield
+  `{ ok: false, errors }` instead of throwing.
 
-## Tamil print helper (`tamilscript/runtime`) — new in v0.4.0
+## Tamil print helper (`tamilscript/runtime`)
 
 `அச்சிடு()` is the first official Tamil helper: it behaves like
 `console.log()` for zero, one, or many arguments of any kind, with
@@ -202,6 +225,69 @@ const { அச்சிடு } = require("tamilscript");
 - `checkFile()` needs no runtime: the helper is an ordinary identifier, so
   `node --check` accepts it without execution.
 
+## Runtime helpers (`tamilscript/runtime`)
+
+Four explicit helpers are exported next to `அச்சிடு`. They are ordinary
+functions, not keywords and not globals; importing the runtime does not
+install them:
+
+```js
+const { சேர், நீளம், எண், சொல் } = require("tamilscript/runtime");
+
+const values = சேர்([1, 2], 3); // [1, 2, 3] (same array)
+நீளம்(values);                  // 3
+எண்("௧௮");                      // 18 (Tamil integer)
+எண்("$௧.௫");                   // 1.5 (Tamil decimal)
+எண்("-$௧௮");                   // -18 (optional leading + or -)
+சொல்(18);                       // "18"
+```
+
+- `சேர்(collection, ...values)` mutates and returns the same Array or Set.
+  Any other receiver throws `TypeError`; it never silently substitutes an
+  immutable collection.
+- `நீளம்(value)` returns a numeric `.length` or `.size`. A value with neither
+  (or `null`/`undefined`) throws `TypeError`.
+- `எண்(value)` parses Tamil integer/decimal strings (with an optional leading
+  `+`/`-` sign and optional `$`) through the same numeral parser as the
+  transformer; other inputs use JavaScript `Number()` coercion, including its
+  `NaN` result for invalid text.
+- `சொல்(value)` is JavaScript `String()` coercion.
+- All four are exported from `tamilscript/runtime`; they are intentionally
+  **not** exported from the package root, so `require("tamilscript")` keeps
+  its existing surface. `அச்சிடு` continues to be re-exported from the root
+  for backward compatibility.
+
+## validate(source, options?)
+
+Syntax-validate TamilScript without executing it. This is the parser-backed
+check used by the VS Code extension.
+
+```js
+const { validate } = require("tamilscript");
+
+validate("let x = $௧௮;");
+// { ok: true, code: "let x = 18;" }
+
+validate("let x = ;");
+// { ok: false, diagnostic: { line: 1, column: 9, name: "SyntaxError",
+//   code: "JST_JAVASCRIPT_SYNTAX", message: "Unexpected token" } }
+
+validate("என்றால் (true) {}", { tamilKeywords: true }); // { ok: true, ... }
+```
+
+- `options.filename` is accepted for consistency with `transform()`; it does
+  not change the syntax check. `options.tamilKeywords` opts in to Tamil
+  keyword aliases.
+- Malformed TamilScript keeps its lexical `JST_*` code. Invalid JavaScript in
+  the transformed output uses `JST_JAVASCRIPT_SYNTAX`.
+- `line` and `column` are 1-based and are mapped back through keyword, range,
+  numeric, and decimal replacements to the original source position.
+- The check is **syntax-only**. It does not resolve imports, check identifier
+  existence, validate types, or prove runtime behavior. Use `run`/`check` for
+  execution checks; Acorn is a parser, not a type checker.
+- Non-string input throws `TypeError`.
+- Validation never executes the source or modifies globals.
+
 ## inlineSourceMapComment(map)
 
 - Renders the `\n//# sourceMappingURL=data:…` comment for a Source Map v3
@@ -227,6 +313,11 @@ JsTamilSyntaxError [JST_BAD_NUMERIC_LITERAL]: <message>
 same identities as `JsTamilError` and `JsTamilSyntaxError`. The historical
 names and the `JST_*` codes remain the stable wire format in diagnostics and
 are kept for compatibility; new code may use either alias.
+
+`ErrorCodes.JAVASCRIPT_SYNTAX` (`"JST_JAVASCRIPT_SYNTAX"`) is the code added
+for parser failures from `validate()` and the VS Code bridge. It is returned
+as data by `validate()` rather than thrown, so existing callers that only
+catch lexical errors are unaffected.
 
 Only the single offending line is shown. Columns count UTF-16 code units,
 matching `node --check`.

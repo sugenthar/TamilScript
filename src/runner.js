@@ -130,9 +130,10 @@ function programEnv() {
  *
  * @param {string} filePath
  * @param {string[]} [extraArgs] forwarded to the program (after the script path)
- * @param {{ nodeFlags?: string[] }} [options]
+ * @param {{ nodeFlags?: string[], tamilKeywords?: boolean }} [options]
  *   `nodeFlags` are extra node options inserted before the script (used by
- *   `run --inspect`/`--inspect-brk`).
+ *   `run --inspect`/`--inspect-brk`); `tamilKeywords` enables the opt-in
+ *   keyword aliases for the entry and every relative dependency.
  * @returns {Promise<number>} the child exit code
  */
 async function runFile(filePath, extraArgs, options) {
@@ -147,7 +148,10 @@ async function runFile(filePath, extraArgs, options) {
     wrapped.cause = err;
     throw wrapped;
   }
-  const transformed = transform(source, { filename: absFile });
+  const transformed = transform(source, {
+    filename: absFile,
+    tamilKeywords: !!opts.tamilKeywords,
+  });
   // Transform relative JS dependencies too, rewriting their specifiers to
   // the transformed siblings (see src/imports.js). Temp files live next to
   // their originals so nested relative imports keep resolving. Inline
@@ -155,6 +159,7 @@ async function runFile(filePath, extraArgs, options) {
   const tree = await buildTransformedTree(absFile, transformed, {
     entrySource: source,
     withMaps: true,
+    tamilKeywords: !!opts.tamilKeywords,
   });
   const tempPath = tree.entryTemp;
   const args = Array.isArray(extraArgs) ? extraArgs : [];
@@ -263,9 +268,11 @@ function renderCheckFailure(stderr, tempPath, absFile, source, positions) {
  * `node --check` on the transformed output. Returns diagnostics.
  *
  * @param {string} filePath
+ * @param {{ tamilKeywords?: boolean }} [options]
  * @returns {Promise<{ ok: boolean, errors: string[] }>}
  */
-async function checkFile(filePath) {
+async function checkFile(filePath, options) {
+  const opts = options || {};
   const absFile = path.resolve(filePath);
   let source;
   try {
@@ -276,7 +283,10 @@ async function checkFile(filePath) {
   let transformed;
   let entryPositions;
   try {
-    const first = transformWithMap(source, { filename: absFile });
+    const first = transformWithMap(source, {
+      filename: absFile,
+      tamilKeywords: !!opts.tamilKeywords,
+    });
     transformed = first.code;
     entryPositions = first.positions;
   } catch (err) {
@@ -288,6 +298,7 @@ async function checkFile(filePath) {
     tree = await buildTransformedTree(absFile, transformed, {
       entrySource: source,
       withMaps: true,
+      tamilKeywords: !!opts.tamilKeywords,
     });
   } catch (err) {
     // Dependency diagnostics already carry their own filename; the entry

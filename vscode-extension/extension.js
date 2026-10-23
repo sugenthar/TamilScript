@@ -31,7 +31,13 @@ const SWITCHABLE_SCHEMES = new Set(['file', 'untitled', 'vscode-remote', 'vscode
 const LANGUAGE_CHANGE_PAIR_MS = 1500;
 
 function readConfig(vscode) {
-  const defaults = { enableDiagnostics: true, debounceMs: 300, corePath: '', autoLanguageMode: true };
+  const defaults = {
+    enableDiagnostics: true,
+    debounceMs: 300,
+    corePath: '',
+    autoLanguageMode: true,
+    tamilKeywords: false,
+  };
   try {
     const ws = vscode && vscode.workspace;
     if (!ws || typeof ws.getConfiguration !== 'function') return defaults;
@@ -62,9 +68,11 @@ function readConfig(vscode) {
     const debounceMs = get('debounceMs');
     const corePath = get('corePath');
     const autoLanguageMode = get('autoLanguageMode');
+    const tamilKeywords = get('tamilKeywords');
     return {
       enableDiagnostics: enableDiagnostics !== undefined ? !!enableDiagnostics : true,
       debounceMs: Number.isFinite(debounceMs) && debounceMs >= 0 ? debounceMs : 300,
+      tamilKeywords: tamilKeywords !== undefined ? !!tamilKeywords : false,
       corePath: typeof corePath === 'string' ? corePath : '',
       autoLanguageMode: autoLanguageMode !== undefined ? !!autoLanguageMode : true,
     };
@@ -171,7 +179,9 @@ function makeHandlers(vscode, deps) {
     }
     const text = doc.getText();
     const name = (doc.uri && doc.uri.fsPath) || doc.fileName || 'untitled';
-    const result = lang.validateText(found.api, text, name);
+    const result = lang.validateText(found.api, text, name, {
+      tamilKeywords: readConfig(vscode).tamilKeywords,
+    });
     if (!collection) return result;
     if (result.ok) {
       collection.delete(doc.uri);
@@ -301,7 +311,9 @@ function makeHandlers(vscode, deps) {
     }
     const found = getCore();
     if (!found.api) return { skipped: true, reason: 'core unavailable' };
-    if (!lang.hasTamilLiterals(found.api, doc.getText())) {
+    if (!lang.hasTamilLiterals(found.api, doc.getText(), {
+      tamilKeywords: readConfig(vscode).tamilKeywords,
+    })) {
       return { skipped: true, reason: 'no tamil literals' };
     }
     state.pending.add(key);
@@ -344,7 +356,9 @@ function makeHandlers(vscode, deps) {
       return { ok: false, error: found.error };
     }
     const name = (doc.uri && doc.uri.fsPath) || doc.fileName || 'untitled';
-    const result = lang.validateText(found.api, doc.getText(), name);
+    const result = lang.validateText(found.api, doc.getText(), name, {
+      tamilKeywords: readConfig(vscode).tamilKeywords,
+    });
     if (result.ok) {
       if (collection) collection.delete(doc.uri);
       if (vscode.window) vscode.window.showInformationMessage('TamilScript: no syntax errors.');
@@ -378,7 +392,9 @@ function makeHandlers(vscode, deps) {
       return { ok: false, error: found.error };
     }
     const name = (doc.uri && doc.uri.fsPath) || doc.fileName || 'untitled';
-    const result = lang.transformText(found.api, doc.getText(), name);
+    const result = lang.transformText(found.api, doc.getText(), name, {
+      tamilKeywords: readConfig(vscode).tamilKeywords,
+    });
     if (!result.ok) {
       const at = `line ${result.diagnostic.line + 1}, column ${result.diagnostic.column + 1}`;
       if (vscode.window) vscode.window.showErrorMessage(`TamilScript: ${result.diagnostic.message} (${at})`);
@@ -450,7 +466,11 @@ function makeHandlers(vscode, deps) {
     }
     let command;
     try {
-      command = lang.buildRunCommand({ cliPath: found.cliPath, filePath });
+      command = lang.buildRunCommand({
+        cliPath: found.cliPath,
+        filePath,
+        extraArgs: readConfig(vscode).tamilKeywords ? ['--tamil-keywords'] : [],
+      });
     } catch (err) {
       const message = (err && err.message) || String(err);
       if (vscode.window) vscode.window.showErrorMessage(`TamilScript: ${message}`);

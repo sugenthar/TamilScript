@@ -24,7 +24,7 @@ class Watcher {
   /**
    * @param {string} filePath entry file
    * @param {string[]} [extraArgs] forwarded to the program
-   * @param {{ stdout?: NodeJS.WritableStream, stderr?: NodeJS.WritableStream, nodeFlags?: string[] }} [streams]
+   * @param {{ stdout?: NodeJS.WritableStream, stderr?: NodeJS.WritableStream, nodeFlags?: string[], tamilKeywords?: boolean }} [streams]
    */
   constructor(filePath, extraArgs, streams) {
     this.entry = path.resolve(filePath);
@@ -32,6 +32,7 @@ class Watcher {
     this.stdout = (streams && streams.stdout) || process.stdout;
     this.stderr = (streams && streams.stderr) || process.stderr;
     this.nodeFlags = (streams && streams.nodeFlags) || [];
+    this.tamilKeywords = !!(streams && streams.tamilKeywords);
     this.dirWatchers = new Map(); // directory -> FSWatcher (survives file replace/delete)
     this.tracked = new Set(); // logical watched files (entry + resolved dependencies)
     this.child = null;
@@ -186,7 +187,10 @@ class Watcher {
     }
     let transformed;
     try {
-      transformed = transform(source, { filename: this.entry });
+      transformed = transform(source, {
+        filename: this.entry,
+        tamilKeywords: this.tamilKeywords,
+      });
     } catch (err) {
       this.errLine(formatDiagnostic(err, { source }));
       this.errLine('Waiting for changes…');
@@ -198,6 +202,7 @@ class Watcher {
       tree = await buildTransformedTree(this.entry, transformed, {
         entrySource: source,
         withMaps: true,
+        tamilKeywords: this.tamilKeywords,
       });
     } catch (err) {
       this.errLine(formatDiagnostic(err, { source }));

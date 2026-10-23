@@ -7,6 +7,18 @@
 
 ## Unreleased
 
+- New setting `tamilscript.tamilKeywords` (default `false`) opts in to the
+  core's implemented Tamil keyword aliases. It is passed to diagnostics,
+  transform previews, Check/Run, and automatic language detection; Run adds
+  `--tamil-keywords` to the terminal command. Off by default, so ordinary
+  Tamil identifiers keep working unchanged.
+- Diagnostics prefer the core's parser-backed `api.validate()` when available
+  and fall back to `transform()` for older cores. Invalid transformed
+  JavaScript now reports `JST_JAVASCRIPT_SYNTAX`; lexical `JST_*` codes are
+  unchanged. Validation remains syntax-only and never executes code.
+- Keyword-only files auto-switch to TamilScript mode when
+  `tamilscript.tamilKeywords` is enabled; the setting is required, so keyword
+  spellings are never silently activated.
 - Breaking (core syntax): `$` is now reserved for Tamil numeric literals.
   Text uses ordinary JavaScript strings; the `$"..."` / `$'...'` form was
   removed and is flagged with the new `JST_TAMIL_STRING_REMOVED` diagnostic

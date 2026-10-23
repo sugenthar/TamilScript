@@ -81,6 +81,7 @@ describe('extension manifest', () => {
     assert.equal(props['tamilscript.debounceMs'].default, 300);
     assert.equal(props['tamilscript.corePath'].default, '');
     assert.equal(props['tamilscript.autoLanguageMode'].default, true);
+    assert.equal(props['tamilscript.tamilKeywords'].default, false);
   });
 
   it('ships license, readme, changelog, and ignore rules', () => {

@@ -82,10 +82,11 @@ async function writeFileAtomic(absPath, content) {
  *
  * @param {string} inputPath path to the `.js` source file
  * @param {string} [outputPath] optional destination for transformed output
- * @param {{ force?: boolean }} [options]
+ * @param {{ force?: boolean, tamilKeywords?: boolean }} [options]
  * @returns {Promise<string>} the transformed, standalone-runnable JavaScript
  */
 async function transformFile(inputPath, outputPath, options) {
+  const opts = options || {};
   if (typeof inputPath !== 'string' || inputPath.length === 0) {
     throw new TypeError('transformFile() expects inputPath as a non-empty string.');
   }
@@ -102,7 +103,10 @@ async function transformFile(inputPath, outputPath, options) {
   // File output is expected to be runnable under plain `node`, so programs
   // that mention the Tamil print helper receive the inlined standalone
   // runtime prelude (src/standalone.js).
-  const { code: output } = addStandaloneRuntime(transform(source, { filename: absIn }), source);
+  const { code: output } = addStandaloneRuntime(
+    transform(source, { filename: absIn, tamilKeywords: !!opts.tamilKeywords }),
+    source
+  );
   if (outputPath == null) {
     return output;
   }
@@ -110,7 +114,7 @@ async function transformFile(inputPath, outputPath, options) {
     throw new TypeError('transformFile() expects outputPath as a non-empty string when provided.');
   }
   const absOut = path.resolve(outputPath);
-  if (isSameFile(absOut, absIn) && !(options && options.force)) {
+  if (isSameFile(absOut, absIn) && !opts.force) {
     const err = new Error(
       `Refusing to overwrite input file ${JSON.stringify(absIn)}. ` +
         'Choose a different output path or pass { force: true }.'
@@ -143,16 +147,16 @@ module.exports = {
  *
  * @param {string} inputPath
  * @param {string} outputPath explicit destination (required)
- * @param {{ force?: boolean, explain?: boolean, sourceMap?: boolean }} [options]
+ * @param {{ force?: boolean, explain?: boolean, sourceMap?: boolean, tamilKeywords?: boolean }} [options]
  * @returns {Promise<{ code: string, events: Array, map: object|null }>}
  */
 async function transformFileWithOptions(inputPath, outputPath, options) {
   const opts = options || {};
   if (typeof inputPath !== 'string' || inputPath.length === 0) {
-    throw new TypeError('transformFile() expects inputPath as a non-empty string.');
+    throw new TypeError('transformFileWithOptions() expects inputPath as a non-empty string.');
   }
   if (typeof outputPath !== 'string' || outputPath.length === 0) {
-    throw new TypeError('transformFile() expects outputPath as a non-empty string when provided.');
+    throw new TypeError('transformFileWithOptions() expects outputPath as a non-empty string.');
   }
   const absIn = path.resolve(inputPath);
   const absOut = path.resolve(outputPath);
@@ -176,17 +180,18 @@ async function transformFileWithOptions(inputPath, outputPath, options) {
   let code;
   let events = [];
   let map = null;
+  const transformOptions = { filename: absIn, tamilKeywords: !!opts.tamilKeywords };
   if (opts.sourceMap) {
-    const r = transformWithMap(source, { filename: absIn });
+    const r = transformWithMap(source, transformOptions);
     code = r.code;
     map = r.map;
-    events = opts.explain ? transformWithMeta(source, { filename: absIn }).events : [];
+    events = opts.explain ? transformWithMeta(source, transformOptions).events : [];
   } else if (opts.explain) {
-    const r = transformWithMeta(source, { filename: absIn });
+    const r = transformWithMeta(source, transformOptions);
     code = r.code;
     events = r.events;
   } else {
-    code = transform(source, { filename: absIn });
+    code = transform(source, transformOptions);
   }
   const packed = addStandaloneRuntime(code, source);
   code = packed.code;

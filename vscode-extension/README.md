@@ -73,9 +73,9 @@ installed VS Code (`code`/`Code.exe`; override with `OT_CODE_BIN`). Pass
 - Automatic highlighting/diagnostics/snippets: `javascript` language
   (covers `.js`, `.mjs`, `.cjs`).
 - Automatic language mode: a JavaScript document that contains TamilScript
-  literals — a saved file, an unsaved buffer, or a remote/virtual-workspace
-  file — is switched to the `tamilscript` language mode
-  (`tamilscript.autoLanguageMode`, default `true`) — see
+  literals (or enabled Tamil keywords) — a saved file, an unsaved buffer, or
+  a remote/virtual-workspace file — is switched to the `tamilscript` language
+  mode (`tamilscript.autoLanguageMode`, default `true`) — see
   [Red squiggles](#red-squiggles-why-they-appear-and-how-they-are-cleared).
 - Explicit language id: `tamilscript`, claimed for `*.ot.js` files by
   default; map other patterns with `files.associations` if you prefer
@@ -111,12 +111,21 @@ grammar (literals + `include: source.js`) backs the opt-in language id.
 ## How diagnostics work
 
 `tamilscriptLang.js` resolves the core API (`workspace/node_modules`,
-`tamilscript.corePath` setting, or the sibling checkout) and calls the
-public `transform()` — the same lexer and `JST_*` codes as the CLI.
-Validation never executes code, never spawns processes, is debounced
-(`tamilscript.debounceMs`, default 300 ms), and clears stale markers on
-change/close. Diagnostics carry `source: tamilscript` and the stable
-`JST_*` code. A missing core shows one warning, never a crash.
+`tamilscript.corePath` setting, or the sibling checkout) and prefers the
+parser-backed `api.validate()`; older cores fall back to `transform()`.
+Both use the same lexer and `JST_*` codes as the CLI. Validation is
+syntax-only: it never resolves imports, checks identifiers, or executes code;
+invalid transformed JavaScript is reported as `JST_JAVASCRIPT_SYNTAX`.
+Diagnostics never spawn processes, are debounced (`tamilscript.debounceMs`,
+default 300 ms), and clear stale markers on change/close. They carry
+`source: tamilscript` and the stable `JST_*` code. A missing core shows one
+warning, never a crash.
+
+`tamilscript.tamilKeywords` (default `false`) opts in to the implemented Tamil
+keyword aliases for diagnostics, transform, check, run, and auto-detection.
+It is passed to the core as `{ tamilKeywords: true }` and to the CLI as
+`--tamil-keywords`. Deferred words and ordinary Tamil identifiers remain
+identifiers; property names after `.`/`#` keep their spelling.
 
 Note: `$`-literals are not valid plain JavaScript, so while a file sits in
 JavaScript mode VS Code's built-in validator underlines them alongside ours.
@@ -144,8 +153,10 @@ starts in the file's directory, so output is complete, standard input
 works, and Ctrl+C still stops the program:
 
 ```text
-node "<resolved>/bin/tamilscript.js" run "<your file>"
+node "<resolved>/bin/tamilscript.js" run --tamil-keywords "<your file>"
 ```
+
+`--tamil-keywords` appears only when `tamilscript.tamilKeywords` is enabled.
 
 - The **CLI script** is resolved like the core API: `tamilscript.corePath`,
   workspace `node_modules/tamilscript/bin/tamilscript.js`, then the sibling
@@ -176,8 +187,8 @@ built-in validator no matter how highlighting is configured. No grammar
 change can fix that; only the language mode determines which validator runs.
 
 The extension therefore switches a document to the dedicated `tamilscript`
-language mode as soon as it contains TamilScript literals
-(`tamilscript.autoLanguageMode`, default `true`). Unsaved buffers are
+language mode as soon as it contains TamilScript literals, or enabled Tamil
+keywords (`tamilscript.autoLanguageMode`, default `true`). Unsaved buffers are
 switched the same way, so a brand-new file is clean from its first literal
 instead of only after it is saved:
 
@@ -270,12 +281,19 @@ For terminal workflows use the core package directly:
 npx -y tamilscript run program.js
 npx -y tamilscript transform input.js -o output.js
 npx -y tamilscript check program.js
+npx -y tamilscript --tamil-keywords check program.ot.js   # opt-in aliases
 ```
 
 ## Known limitations
 
 - One diagnostic per file (first error), matching core `transform()` behavior.
 - Columns count UTF-16 units, matching `node --check` conventions.
+- Tamil keyword diagnostics depend on `tamilscript.tamilKeywords`; with it
+  off, `என்றால் (true) {}` is correctly treated as ordinary (invalid)
+  JavaScript rather than silently enabled. The setting is also required for
+  keyword-only files to auto-switch.
+- `validate()` is syntax-only, so undefined identifiers, unresolved imports,
+  and type errors are not diagnostics in the editor or core API.
 - Automatic mode switching does not apply to synthetic or read-only
   documents (diff sides, output panels, notebook cells); those stay in
   JavaScript mode, where the built-in validator's false parser squiggles on

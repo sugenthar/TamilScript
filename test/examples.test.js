@@ -77,6 +77,12 @@ describe('examples', () => {
     }
   });
 
+  it('esm example runs directly from its package boundary', () => {
+    const r = run(['run', 'examples/esm/main.js']);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /decimal: 1\.5/);
+  });
+
   it('commonjs example runs with require', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tamilscript-ex-cjs-'));
     try {
@@ -126,5 +132,11 @@ describe('examples', () => {
     });
     assert.equal(viaNode.status, 0, viaNode.stderr);
     assert.equal(viaNode.stdout, expected);
+  });
+
+  it('tamil-keywords.ot.js runs only with keyword mode and prints verified output', () => {
+    const r = run(['--tamil-keywords', 'run', 'examples/tamil-keywords.ot.js']);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, 'வணக்கம் தமிழ்\n1,9,25 3\n');
   });
 });

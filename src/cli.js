@@ -78,6 +78,13 @@ Global options:
   --tamil     Print CLI-authored labels and fixed messages in Tamil where a
               tested translation exists (English fallback otherwise).
               Also enabled by the TAMILSCRIPT_LANG=tamil environment variable.
+  --tamil-keywords
+              Opt in to Tamil keyword aliases (என்றால், செயல், வகுப்பு, ...)
+              for run, transform, check, format, lint, and repl. Off by default
+              so existing Tamil identifiers keep their JavaScript meaning.
+              Also enabled by TAMILSCRIPT_KEYWORDS=1.
+              Put global flags before \`--\`; program arguments after \`--\` are
+              forwarded untouched.
 
 Exit codes:
   0  success (for run: the program's own exit code; for test: npm's)
@@ -90,6 +97,7 @@ Examples:
   tamilscript run program.js -- arg1 arg2
   tamilscript transform input.js -o output.js
   tamilscript transform input.js --explain -o output.js
+  tamilscript --tamil-keywords run program.ot.js
   tamilscript check program.js
   tamilscript init my-app && cd my-app && npm install && npm start
   tamilscript doctor
@@ -321,24 +329,36 @@ function writeUsageError(stderr, tamil, message, help) {
 }
 
 /**
- * Extract the global `--tamil` flag. Only tokens before an explicit `--`
- * separator are treated as CLI flags; anything after it belongs to the
- * target program and is forwarded untouched.
+ * Extract global flags. Only tokens before an explicit `--` separator are
+ * treated as CLI flags; anything after it belongs to the target program and
+ * is forwarded untouched.
  */
-function extractTamilFlag(args) {
+function extractGlobalFlags(args) {
   const sep = args.indexOf('--');
   const head = sep === -1 ? args : args.slice(0, sep);
   const tail = sep === -1 ? [] : args.slice(sep);
   const kept = [];
-  let flag = false;
+  let tamil = false;
+  let tamilKeywords = false;
   for (const a of head) {
     if (a === '--tamil') {
-      flag = true;
+      tamil = true;
+      continue;
+    }
+    if (a === '--tamil-keywords') {
+      tamilKeywords = true;
       continue;
     }
     kept.push(a);
   }
-  return { args: kept.concat(tail), flag };
+  return { args: kept.concat(tail), tamil, tamilKeywords };
+}
+
+/** Accept the usual explicit truthy environment spellings. */
+function envFlag(name) {
+  const value = process.env[name];
+  if (value == null) return false;
+  return /^(1|true|yes|on)$/i.test(String(value).trim());
 }
 
 function formatInitReport(result) {
@@ -445,13 +465,17 @@ async function main(argv, streams) {
   const stdout = (streams && streams.stdout) || process.stdout;
   const stderr = (streams && streams.stderr) || process.stderr;
   const io = { stdout, stderr };
-  const parsed = extractTamilFlag(argv.slice(2));
+  const parsed = extractGlobalFlags(argv.slice(2));
   const args = parsed.args;
   // OPENTAMIZH_LANG is the pre-rename spelling, still honored so existing
   // scripts and editor profiles keep working.
   const tamil =
-    parsed.flag ||
+    parsed.tamil ||
     isTamilLanguage(process.env.TAMILSCRIPT_LANG || process.env.OPENTAMIZH_LANG);
+  // Keyword mode is strictly opt-in. The environment variable is useful for
+  // REPL/editor shells that cannot pass CLI flags; it is never enabled by
+  // default and never changes ordinary Tamil identifiers.
+  const tamilKeywords = parsed.tamilKeywords || envFlag('TAMILSCRIPT_KEYWORDS');
 
   if (args.length === 0 || args[0] === '--help' || args[0] === '-h' || args[0] === 'help') {
     stdout.write(USAGE);
@@ -521,9 +545,14 @@ async function main(argv, streams) {
     }
     try {
       if (watch) {
-        return await watchAndRun(file, forwarded, { stdout, stderr, nodeFlags });
+        return await watchAndRun(file, forwarded, {
+          stdout,
+          stderr,
+          nodeFlags,
+          tamilKeywords,
+        });
       }
-      const code = await runFile(file, forwarded, { nodeFlags });
+      const code = await runFile(file, forwarded, { nodeFlags, tamilKeywords });
       return code;
     } catch (err) {
       stderr.write(`${formatCliError(err, { source: readSourceBestEffort(file), tamil })}\n`);
@@ -613,7 +642,10 @@ async function main(argv, streams) {
     try {
       if (output == null) {
         const source = fs.readFileSync(path.resolve(input), 'utf8');
-        const transformed = transform(source, { filename: path.resolve(input) });
+        const transformed = transform(source, {
+          filename: path.resolve(input),
+          tamilKeywords,
+        });
         // Match `-o` output: helper programs get the standalone prelude.
         const { code: out } = addStandaloneRuntime(transformed, source);
         stdout.write(out);
@@ -626,6 +658,7 @@ async function main(argv, streams) {
           force,
           explain,
           sourceMap,
+          tamilKeywords,
         });
         if (explain) {
           stdout.write(formatExplain(path.resolve(input), result.events));
@@ -634,7 +667,7 @@ async function main(argv, streams) {
         if (sourceMap) stdout.write(`Source map written to ${output}.map\n`);
         return 0;
       }
-      await transformFile(input, output, { force });
+      await transformFile(input, output, { force, tamilKeywords });
       stdout.write(`Transformed ${input} -> ${output}\n`);
       return 0;
     } catch (err) {
@@ -674,7 +707,7 @@ async function main(argv, streams) {
       return 1;
     }
     try {
-      const result = await checkFile(file);
+      const result = await checkFile(file, { tamilKeywords });
       if (result.ok) {
         stdout.write(`OK: ${file} — TamilScript syntax and transformed JavaScript are valid.\n`);
         return 0;
@@ -728,7 +761,7 @@ async function main(argv, streams) {
     }
     let formatted;
     try {
-      formatted = formatSource(source);
+      formatted = formatSource(source, { tamilKeywords });
     } catch (err) {
       stderr.write(`${formatCliError(err, { source, tamil })}\n`);
       return 1;
@@ -786,7 +819,10 @@ async function main(argv, streams) {
       return 1;
     }
     try {
-      const result = await lintPath(absTarget, { isDirectory: kind === 'directory' });
+      const result = await lintPath(absTarget, {
+        isDirectory: kind === 'directory',
+        tamilKeywords,
+      });
       stdout.write(formatLintReport(result, { tamil }));
       return result.problems.length > 0 ? 1 : 0;
     } catch (err) {
@@ -821,7 +857,7 @@ async function main(argv, streams) {
         REPL_HELP
       );
     }
-    return runRepl({ output: stdout, error: stderr });
+    return runRepl({ output: stdout, error: stderr, tamilKeywords });
   }
 
   const message = `${label('unknownCommand', tamil)} ${JSON.stringify(command)}.`;
@@ -833,7 +869,7 @@ async function main(argv, streams) {
  * literals cannot flood the report.
  */
 function formatExplain(filename, events) {
-  const counts = { number: 0, decimal: 0 };
+  const counts = { number: 0, decimal: 0, range: 0, keyword: 0 };
   const lines = [];
   for (const e of events) {
     if (counts[e.type] !== undefined) counts[e.type] += 1;
@@ -843,9 +879,15 @@ function formatExplain(filename, events) {
     lines.push(`${filename}:${e.line}:${e.column}  ${e.type}  ${shown} -> ${truncateValue(e.value)}`);
   }
   const total = events.length;
+  const breakdown = [
+    `${counts.number} number`,
+    `${counts.decimal} decimal`,
+  ];
+  if (counts.range) breakdown.push(`${counts.range} range`);
+  if (counts.keyword) breakdown.push(`${counts.keyword} keyword`);
   lines.push(
     `Transformed ${total} literal${total === 1 ? '' : 's'}: ` +
-    `${counts.number} number, ${counts.decimal} decimal.`
+    `${breakdown.join(', ')}.`
   );
   return lines.join('\n') + '\n';
 }

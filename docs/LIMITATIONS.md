@@ -19,7 +19,7 @@
   the integer (`$.௫`), a repeated separator (`$௧.௫.௬`), a dangling dot
   (`$௧.௫.`, `$௧.௫..toString()`), and `$`+digits after the decimal point
   (`$௧.௫.$௨`).
-- **Tamil print helper availability (new in v0.4.0).** `அச்சிடு()` is an
+- **Tamil print helper availability.** `அச்சிடு()` is an
   ordinary identifier, not syntax, and behaves like `console.log()`. It is
   installed automatically (and only) by `run`/`runFile` — including
   `--watch` — when the program mentions it; `transform` output instead
@@ -39,8 +39,33 @@
   soon as the stream reports color support, silently changing piped or
   captured output). `console.log()` inside a program is untouched, so
   programs that want color can use it or a color library.
-- **One Tamil helper on purpose.** Only `அச்சிடு()` ships in v0.4.0; no
-  warn/error/display siblings are included or planned for this release.
+- **One automatically installed helper.** Only `அச்சிடு()` is installed by
+  `run`/`transform` when mentioned. The four explicit helpers `சேர்`,
+  `நீளம்`, `எண்`, and `சொல்` live in `tamilscript/runtime`; they are never
+  installed as globals and are not keywords. `சேர்` mutates an Array/Set and
+  `நீளம்` reads `.length`/`.size`; neither guesses at immutable replacements.
+- **Tamil keywords are opt-in and reserved only when enabled.** Default
+  scanning treats every Tamil word as an ordinary identifier. In keyword
+  mode the twelve implemented words are reserved: using one as a binding
+  produces invalid JavaScript and therefore a diagnostic. Seven proposed
+  words (`செயல்படுத்து`, `பொது`, `தனி`, `இடைமுகம்`, `எண்ணகம்`, `வெற்று`,
+  `தொகுப்பு`) are deliberately deferred because JavaScript has no equivalent
+  grammar; they remain identifiers. Property names after `.`/`#`, object
+  keys, class fields, and ordinary class/object member names are not
+  rewritten. The sole exception is `உருவாக்கு(...)` as a bare class
+  constructor, which maps to `constructor`. The scanner does not do scope
+  analysis, so a Tamil word chosen as a local variable name is still treated
+  as a keyword when the mode is on.
+- **Ranges are bounded.** `$௧..$௫` is ascending and inclusive; both endpoints
+  must be safe integers, and more than 100,000 values is rejected instead of
+  allocated. Decimal endpoints are numeric errors, not ranges. Ranges are
+  part of the `$` literal layer and need no keyword flag. Expansion is a
+  self-contained array expression and does not resolve a global `Array`
+  identifier.
+- **`validate()` is syntax-only.** It parses transformed JavaScript with
+  Acorn; it does not resolve imports, check identifiers, infer types, or
+  execute code. `check` remains the CLI that runs `node --check` over the
+  transformed dependency tree; `run` is required for runtime behavior.
 - **REPL scope.** `tamilscript repl` runs the same transformer and the same
   Node.js engine (`node:vm`, no `eval`, no second JavaScript engine) with a
   persistent context. It does not support top-level `await`, automatic
@@ -55,7 +80,7 @@
   whitespace-only lines into empty lines, and adds a missing final line
   break (`\r\n` for CRLF files, `\n` otherwise; lone-`\r` content is
   preserved). Whitespace inside strings, templates, comments, regexes and
-  TamilScript strings is never touched, and formatting is idempotent.
+  Tamil literals is never touched, and formatting is idempotent.
   Malformed TamilScript is refused unchanged.
 - **Linter scope.** `tamilscript lint` reports only high-confidence
   problems: `OT001` (the lexer rejects the source), `OT002` (the
@@ -101,7 +126,7 @@
   collide.
 - **Line numbers are preserved exactly**: replacements never add or remove
   line breaks. Columns shift where a literal changes width.
-- **Source maps (new in v0.2.0).** `run` attaches inline maps and stack
+- **Source maps.** `run` attaches inline maps and stack
   traces point at the original files (verified by tests for entry,
   dependency and ESM failures); `transform --source-map` writes an
   external `.map`. Maps are line-accurate everywhere and column-accurate

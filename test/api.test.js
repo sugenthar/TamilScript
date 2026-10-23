@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const api = require('../src/index');
+const { transformFileWithOptions } = require('../src/transform-file');
 
 describe('public API', () => {
   it('exports the documented functions', () => {
@@ -99,5 +100,32 @@ describe('public API', () => {
     const fn = mod.transform || (mod.default && mod.default.transform);
     assert.equal(typeof fn, 'function');
     assert.equal(fn('let x = $௨;'), 'let x = 2;');
+  });
+});
+
+// Regression test for Bug 3: transformFileWithOptions() error messages must
+// name the correct function (not transformFile()).
+describe('transformFileWithOptions() error messages', () => {
+  it('names transformFileWithOptions in the inputPath error', async () => {
+    await assert.rejects(
+      () => transformFileWithOptions('', 'out.js'),
+      (err) => {
+        assert.ok(err instanceof TypeError);
+        assert.equal(err.message, 'transformFileWithOptions() expects inputPath as a non-empty string.');
+        return true;
+      }
+    );
+  });
+
+  it('names transformFileWithOptions and does not say outputPath is optional', async () => {
+    await assert.rejects(
+      () => transformFileWithOptions('in.js', ''),
+      (err) => {
+        assert.ok(err instanceof TypeError);
+        assert.equal(err.message, 'transformFileWithOptions() expects outputPath as a non-empty string.');
+        assert.doesNotMatch(err.message, /when provided/);
+        return true;
+      }
+    );
   });
 });

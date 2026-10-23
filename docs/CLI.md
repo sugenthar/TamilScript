@@ -2,6 +2,28 @@
 
 The `tamilscript` binary is registered via `package.json` `bin`.
 
+## Global option: `--tamil-keywords`
+
+Tamil keywords are **off by default**. Enable them for `run`, `transform`,
+`check`, `format`, `lint`, and `repl` with:
+
+```bash
+tamilscript --tamil-keywords run program.ot.js
+tamilscript transform program.ot.js --tamil-keywords --stdout
+TAMILSCRIPT_KEYWORDS=1 tamilscript check program.ot.js
+```
+
+- The flag is global and may appear before the command or after the command
+  name, but must be before `--`. Everything after `--` is forwarded to the
+  program untouched.
+- `TAMILSCRIPT_KEYWORDS=1` (or `true`/`yes`/`on`, case-insensitive) enables
+  the same mode; the flag always works even when the variable is unset.
+- Only the implemented aliases in
+  [SYNTAX.md](SYNTAX.md#41-tamil-keywords-opt-in) are rewritten.
+  Deferred words and the runtime helper names remain identifiers.
+- `--tamil` is unrelated: it localizes CLI messages and does not enable
+  keyword rewriting.
+
 ## tamilscript run [--watch] \<file.js\> [-- args...]
 
 Transform and execute a TamilScript file.
@@ -11,7 +33,13 @@ npx -y tamilscript run example.js
 npx -y tamilscript run program.js -- arg1 "arg two"
 npx -y tamilscript run program.js arg1 arg2   # same, without --
 npx -y tamilscript run --watch program.js     # rerun on changes
+npx -y tamilscript --tamil-keywords run program.ot.js  # opt-in keyword aliases
 ```
+
+`--tamil-keywords` is parsed before the program arguments, so the transformed
+program, every tracked relative dependency, and each watch rerun use the same
+keyword mode. A literal `--tamil-keywords` after `--` is forwarded to the
+program.
 
 - Reads the file, transforms TamilScript literals, writes transformed output
   (entry **plus** relative JS dependencies, with specifiers rewritten) to
@@ -84,6 +112,7 @@ npx -y tamilscript transform input.js --stdout
 npx -y tamilscript transform input.js -o output.js --force   # allow same-file overwrite
 npx -y tamilscript transform input.js --explain -o output.js # literal report
 npx -y tamilscript transform input.js -o output.js --source-map  # external .map
+npx -y tamilscript transform input.ot.js --tamil-keywords --stdout
 ```
 
 - Requires `-o/--output` (or `--stdout`); the two destinations are
@@ -93,9 +122,10 @@ npx -y tamilscript transform input.js -o output.js --source-map  # external .map
   output is written atomically (temp sibling + rename).
 - `--stdout` writes the transformed code, ending with exactly one trailing
   newline.
-- `--explain` prints one line per transformed literal
-  (`file:line:col  type  source -> value`) plus a totals line. String
-  contents are truncated to 32 characters so reports stay safe to share.
+- `--explain` prints one line per transformed literal or keyword
+  (`file:line:col  type  source -> value`) plus a totals line. Types are
+  `number`, `decimal`, `range`, and (with `--tamil-keywords`) `keyword`.
+  Contents are truncated to 32 characters so reports stay safe to share.
   Conflicts with `--stdout` (exit `2`).
 - `--source-map` writes `<output>.map` (Source Map v3) and appends a
   `sourceMappingURL` comment to the output. Requires `-o/--output`.
@@ -119,6 +149,7 @@ Validate without executing.
 
 ```bash
 npx -y tamilscript check program.js
+npx -y tamilscript --tamil-keywords check program.ot.js
 ```
 
 - Checks TamilScript syntax (with filename + line/column + snippet
@@ -136,6 +167,7 @@ Conservative, parser-free whitespace normalization of one file, in place.
 ```bash
 npx -y tamilscript format program.js            # rewrite in place if needed
 npx -y tamilscript format program.js --check    # report only; never writes
+npx -y tamilscript --tamil-keywords format program.ot.js
 ```
 
 - Removes trailing spaces/tabs (and `\v`/`\f`) at end of line; lines that
@@ -161,7 +193,11 @@ Report high-confidence problems, one file or a whole tree.
 ```bash
 npx -y tamilscript lint program.js
 npx -y tamilscript lint src/          # recursive; skips node_modules and .git
+npx -y tamilscript --tamil-keywords lint src/   # parse Tamil keywords too
 ```
+
+Keyword mode stays opt-in for lint. The `.ot.js` suffix selects the editor
+language mode; it does not enable keyword rewriting by itself.
 
 Rules (JavaScript problems are never mixed with literal problems):
 
@@ -190,15 +226,25 @@ Rules (JavaScript problems are never mixed with literal problems):
 
 Create a starter project.
 
+The current public registry release is `tamilscript@0.1.0`:
+
 ```bash
-npx -y tamilscript init my-app
-cd my-app && npm install && npm start   # after publication; prints: வணக்கம், தமிழ்! 36
-npx -y tamilscript init --force             # re-scaffold the current directory
+npx -y tamilscript@0.1.0 init my-app
+cd my-app && npm install && npm start   # prints: வணக்கம், தமிழ்! 36
+npx -y tamilscript@0.1.0 init --force   # re-scaffold the current directory
 ```
 
-Before `tamilscript` is published, install the packed tarball in the generated
-project instead of resolving the `^` devDependency from the registry:
-`npm install /absolute/path/to/tamilscript-0.1.0.tgz`.
+The `0.2.0` release candidate is not on the public registry. From a checkout
+with the candidate tarball already packed, run the local CLI and point the
+generated project at that tarball instead of resolving `^0.2.0` from the
+registry:
+
+```bash
+node bin/tamilscript.js init my-app
+cd my-app
+npm install /absolute/path/to/tamilscript-0.2.0.tgz
+npm start
+```
 
 - Creates four files: `package.json` (scripts `start`/`check`/`test` and an
   `tamilscript` devDependency), `README.md`, `src/app.ot.js` (Tamil
@@ -263,11 +309,14 @@ Start an interactive TamilScript session.
 
 ```bash
 npx -y tamilscript repl
+npx -y tamilscript --tamil-keywords repl   # accept the opt-in aliases
 ```
 
 - Every input goes through the same core transformer as `tamilscript run`;
   execution uses the Node.js runtime (`node:vm`) — no `eval`, no second
   JavaScript engine. `$` literals and `அச்சிடு()` work like everywhere else.
+  Keyword mode persists for the whole session when enabled at startup; the
+  runtime helpers remain explicit imports inside the REPL.
 - Expressions print their value (`undefined` results print nothing, strings
   are quoted, objects are inspected); variables persist across inputs, and
   errors are reported without ending the session.
@@ -317,7 +366,7 @@ TAMILSCRIPT_LANG=tamil npx -y tamilscript doctor
 ## tamilscript --version / --help
 
 ```bash
-npx -y tamilscript --version   # e.g. 0.1.0
+npx -y tamilscript --version   # 0.2.0 for this release candidate
 npx -y tamilscript --help
 npx -y tamilscript run --help  # per-command help (also transform/check/format/lint/init/test/doctor/repl)
 ```

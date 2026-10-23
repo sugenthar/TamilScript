@@ -109,6 +109,11 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically switch documents that contain TamilScript literals (saved files, unsaved buffers, and remote or virtual workspaces) to the TamilScript language mode, where the built-in JavaScript validator does not flag valid Tamil literals as syntax errors. Ordinary JavaScript documents are never switched, file contents are never touched, and switching a document back to JavaScript is respected for the session."
+        },
+        "tamilscript.tamilKeywords": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt in to Tamil keyword aliases such as என்றால் (if), செயல் (function), and வகுப்பு (class) for diagnostics, transform commands, and run commands. Disabled by default so existing Tamil identifiers keep their JavaScript meaning."
         }
       }
     }

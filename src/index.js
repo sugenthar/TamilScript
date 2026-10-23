@@ -4,6 +4,7 @@ const { toNumber, toTamilNumerals, parseTamilDecimal, toTamilDecimal } = require
 const { transform, transformWithMap, transformWithMeta } = require('./transformer');
 const { transformFile } = require('./transform-file');
 const { runFile, checkFile } = require('./runner');
+const { validate } = require('./validation');
 const { அச்சிடு } = require('./runtime');
 const { inlineSourceMapComment } = require('./sourcemap');
 const errors = require('./errors');
@@ -45,5 +46,6 @@ module.exports = {
   TamilScriptError,
   TamilScriptSyntaxError,
   அச்சிடு,
+  validate,
   VERSION,
 };

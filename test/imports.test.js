@@ -6,7 +6,7 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { findSpecifierSpans } = require('../src/imports');
+const { findSpecifierSpans, tempExtensionFor } = require('../src/imports');
 
 const ROOT = path.resolve(__dirname, '..');
 const BIN = path.join(ROOT, 'bin', 'tamilscript.js');
@@ -362,6 +362,33 @@ describe('dependency rewriting', () => {
       assert.deepEqual(new Set(fs.readdirSync(dir)), before);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('temporary module extension selection', () => {
+  it('preserves explicit syntax and package type, sniffing only package-less sources', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tamilscript-ext-'));
+    try {
+      assert.equal(await tempExtensionFor(path.join(root, 'a.mjs'), 'module.exports = 1;\n'), '.mjs');
+      assert.equal(await tempExtensionFor(path.join(root, 'a.cjs'), 'export const n = 1;\n'), '.cjs');
+
+      const moduleDir = path.join(root, 'pkg-module');
+      fs.mkdirSync(moduleDir);
+      fs.writeFileSync(path.join(moduleDir, 'package.json'), JSON.stringify({ type: 'module' }), 'utf8');
+      assert.equal(await tempExtensionFor(path.join(moduleDir, 'a.js'), 'export const n = 1;\n'), '.js');
+
+      const commonjsDir = path.join(root, 'pkg-commonjs');
+      fs.mkdirSync(commonjsDir);
+      fs.writeFileSync(path.join(commonjsDir, 'package.json'), JSON.stringify({ type: 'commonjs' }), 'utf8');
+      assert.equal(await tempExtensionFor(path.join(commonjsDir, 'a.js'), 'export const n = 1;\n'), '.js');
+
+      const plainDir = path.join(root, 'plain');
+      fs.mkdirSync(plainDir);
+      assert.equal(await tempExtensionFor(path.join(plainDir, 'cjs.js'), 'module.exports = 1;\n'), '.cjs');
+      assert.equal(await tempExtensionFor(path.join(plainDir, 'esm.js'), 'export const n = 1;\n'), '.mjs');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
     }
   });
 });

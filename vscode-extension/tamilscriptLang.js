@@ -2,7 +2,8 @@
 
 // VS Code-independent bridge to the TamilScript core transformer.
 // This module never touches the `vscode` API, never spawns processes and
-// never executes user code: validation uses transform() only.
+// never executes user code: validation uses the core transform + parser-backed
+// validate() API, falling back to transform() for older cores.
 //
 // Tamil code points below are built with String.fromCodePoint so this file
 // stays pure ASCII.
@@ -74,12 +75,35 @@ function resolveCore(options) {
  * @param {object} api tamilscript public API
  * @param {string} text source text
  * @param {string} [filename] used in messages only
+ * @param {{ tamilKeywords?: boolean }} [options]
  * @returns {{ ok: true } | { ok: false, diagnostic: { line: number, column: number, message: string, code: string|null, name: string } }}
  *   line/column are 0-based for editors (core reports 1-based).
  */
-function validateText(api, text, filename) {
+function validateText(api, text, filename, options) {
+  const opts = options || {};
+  const transformOptions = {
+    ...(filename !== undefined ? { filename } : {}),
+    tamilKeywords: !!opts.tamilKeywords,
+  };
   try {
-    api.transform(text, filename !== undefined ? { filename } : undefined);
+    // Prefer the parser-backed core validator. Older cores only expose
+    // transform(); keep a working, honestly weaker fallback for them.
+    if (typeof api.validate === 'function') {
+      const result = api.validate(text, transformOptions);
+      if (result && result.ok) return { ok: true };
+      const diag = result && result.diagnostic ? result.diagnostic : {};
+      return {
+        ok: false,
+        diagnostic: {
+          line: diag.line != null ? Math.max(0, diag.line - 1) : 0,
+          column: diag.column != null ? Math.max(0, diag.column - 1) : 0,
+          message: diag.message || 'Invalid TamilScript syntax',
+          code: diag.code || null,
+          name: diag.name || 'SyntaxError',
+        },
+      };
+    }
+    api.transform(text, transformOptions);
     return { ok: true };
   } catch (err) {
     const line = err && err.line != null ? Math.max(0, err.line - 1) : 0;
@@ -109,18 +133,23 @@ function validateText(api, text, filename) {
  *
  * @param {object} api tamilscript public API
  * @param {string} text source text
+ * @param {{ tamilKeywords?: boolean }} [options]
  * @returns {boolean}
  */
-function hasTamilLiterals(api, text) {
-  if (typeof text !== 'string' || text.indexOf('$') === -1) return false;
+function hasTamilLiterals(api, text, options) {
+  const opts = options || {};
+  if (typeof text !== 'string') return false;
+  // Without keyword mode a source with no `$` cannot contain a TamilScript
+  // transformation, so avoid lexing every ordinary JavaScript document.
+  if (!opts.tamilKeywords && text.indexOf('$') === -1) return false;
   try {
     if (typeof api.transformWithMeta === 'function') {
-      const result = api.transformWithMeta(text);
+      const result = api.transformWithMeta(text, { tamilKeywords: !!opts.tamilKeywords });
       return !!(result && Array.isArray(result.events) && result.events.length > 0);
     }
     // Older cores: literals are the only thing transform() rewrites
     // (sources without them pass through byte-identical).
-    return api.transform(text) !== text;
+    return api.transform(text, { tamilKeywords: !!opts.tamilKeywords }) !== text;
   } catch (err) {
     return !!(err && typeof err.code === 'string' && err.code.indexOf('JST_') === 0);
   }
@@ -130,10 +159,17 @@ function hasTamilLiterals(api, text) {
  * Transform source without executing it.
  * @returns {{ ok: true, code: string } | { ok: false, diagnostic: object }}
  */
-function transformText(api, text, filename) {
-  const checked = validateText(api, text, filename);
+function transformText(api, text, filename, options) {
+  const opts = options || {};
+  const checked = validateText(api, text, filename, opts);
   if (!checked.ok) return checked;
-  return { ok: true, code: api.transform(text, filename !== undefined ? { filename } : undefined) };
+  return {
+    ok: true,
+    code: api.transform(text, {
+      ...(filename !== undefined ? { filename } : {}),
+      tamilKeywords: !!opts.tamilKeywords,
+    }),
+  };
 }
 
 function getVersion(api) {

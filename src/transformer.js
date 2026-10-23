@@ -19,7 +19,9 @@ const { buildSourceMap } = require('./sourcemap');
  * This function transforms only; it never executes the source.
  *
  * @param {string} source TamilScript source text
- * @param {{ filename?: string }} [options] optional filename used in error messages
+ * @param {{ filename?: string, tamilKeywords?: boolean }} [options]
+ *   optional filename used in error messages; `tamilKeywords` opts in to the
+ *   documented Tamil keyword aliases (off by default)
  * @returns {string} standard JavaScript source
  * @throws {TypeError} when source is not a string
  * @throws {import('./errors').JsTamilSyntaxError} on malformed TamilScript syntax
@@ -34,7 +36,9 @@ function transform(source, options) {
  * outside replaced literal spans).
  *
  * @param {string} source TamilScript source text
- * @param {{ filename?: string }} [options] filename recorded in the map's `sources`
+ * @param {{ filename?: string, tamilKeywords?: boolean }} [options]
+ *   filename recorded in the map's `sources`; `tamilKeywords` opts in to
+ *   Tamil keyword aliases
  * @returns {{ code: string, map: object, replacements: Array }} transformed
  *   code plus source map; `replacements` are the low-level single-line
  *   segments used to build the map (1-based lines, 0-based columns).
@@ -64,9 +68,11 @@ function transformWithMap(source, options) {
  * strictly opt-in: plain `transform()` never records source snippets.
  *
  * @param {string} source TamilScript source text
- * @param {{ filename?: string }} [options]
+ * @param {{ filename?: string, tamilKeywords?: boolean }} [options]
+ *   filename used in error messages; `tamilKeywords` opts in to Tamil keyword
+ *   aliases
  * @returns {{ code: string, events: Array<{ type: string, line: number, column: number, text: string, value: string }> }}
- *   `type` is one of `"number"` or `"decimal"`.
+ *   `type` is one of `"number"`, `"decimal"`, `"range"`, or `"keyword"`.
  * @throws {TypeError} when source is not a string
  * @throws {import('./errors').JsTamilSyntaxError} on malformed TamilScript syntax
  */

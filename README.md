@@ -20,12 +20,14 @@ const மொத்தம் = தமிழ் + ஆங்கிலம்;
 npx -y tamilscript run hello.js
 ```
 
-> `tamilscript` is not yet published on the public npm registry. Until it is,
-> install the packed tarball locally as shown under [Installation](#installation);
-> after publication the command above works unchanged. TamilScript was
-> previously named **OpenTamizh**; see [MIGRATION.md](MIGRATION.md). Feature
-> annotations like `(v0.2.0)` refer to pre-rename development milestones; the
-> version of this package is `0.1.0`.
+> The release candidate in this checkout is `tamilscript@0.2.0`; the previously
+> published registry release is `0.1.0`. The 0.2.0 additions are opt-in Tamil
+> keywords, inclusive ranges, parser-backed `validate()`, and explicit runtime
+> helpers. To try them before the 0.2.0 tarball is published, pack and install
+> it as shown under [Installation](#installation). TamilScript was previously
+> named **OpenTamizh**; see [MIGRATION.md](MIGRATION.md). Historical version
+> numbers in the changelog are marked as OpenTamizh milestones and are not
+> TamilScript releases.
 
 > Custom TamilScript syntax (`$` literals) must be executed through `npx -y tamilscript run hello.js`, not directly through `node hello.js` — plain Node.js cannot parse `$` literals. To get a plain-JS file, transform first: `npx -y tamilscript transform hello.js -o hello.out.js` produces output that runs under `node` directly (when the program mentions `அச்சிடு()`, the output carries a small inlined runtime prelude, so no import or install is needed). Programs that avoid `$` literals (Tamil identifiers plus an explicit `tamilscript/runtime` import) also run under plain `node` unchanged; see [examples/print-explicit.js](examples/print-explicit.js).
 
@@ -44,7 +46,7 @@ npx -y tamilscript transform hello.js --stdout  # see the plain JS output
 Local development without publishing:
 
 ```bash
-npm install          # no dependencies to fetch; enables npm scripts
+npm install          # installs the single parser dependency (acorn)
 npm test             # full suite
 npm pack --pack-destination .  # creates tamilscript-<version>.tgz
 ```
@@ -87,8 +89,11 @@ npm pack --pack-destination .  # creates tamilscript-<version>.tgz
 Next steps: functions in [examples/tamil-functions.js](examples/tamil-functions.js),
 arrays/objects/loops in [examples/tamil-collections.js](examples/tamil-collections.js),
 an explicit-import program that also runs under plain `node` in
-[examples/print-explicit.js](examples/print-explicit.js), and the full marks
-report in [examples/print-helper.js](examples/print-helper.js).
+[examples/print-explicit.js](examples/print-explicit.js), the full marks
+report in [examples/print-helper.js](examples/print-helper.js), and opt-in
+Tamil keywords with ranges/helpers in
+[examples/tamil-keywords.ot.js](examples/tamil-keywords.ot.js)
+(`npx -y tamilscript --tamil-keywords run examples/tamil-keywords.ot.js`).
 
 ## Why TamilScript exists
 
@@ -97,8 +102,9 @@ in their own script while using 100% standard JavaScript for everything
 else — variables, operators, functions, classes, modules. Node.js cannot
 natively parse `$௧௮`, so TamilScript is a small source transformer: it rewrites
 the custom literal forms into plain JS, then delegates execution to the
-normal Node.js runtime. No JS semantics are reimplemented. Zero runtime
-dependencies.
+normal Node.js runtime. No JS semantics are reimplemented. The package has
+one small runtime dependency, Acorn, used only for parser-backed syntax
+validation in editors and `validate()`.
 
 ## Requirements
 
@@ -110,25 +116,25 @@ dependencies.
 
 ## Installation
 
-The package is **not published under the new name yet**. These commands are the
-intended installation once it is on the registry:
+The previously published registry release is `tamilscript@0.1.0`:
 
 ```bash
 npm install tamilscript
 npx -y tamilscript run hello.js
 ```
 
-To try this checkout before publication, pack it and install the tarball in the
-project where you want to use it (replace the path with the filename npm prints):
+The `0.2.0` release candidate is not on the registry yet. Pack and install the
+tarball in the project where you want to try it (replace the path with the
+filename npm prints):
 
 ```bash
 npm pack --pack-destination .
 # in another project:
-npm install /absolute/path/to/tamilscript-0.1.0.tgz
+npm install /absolute/path/to/tamilscript-0.2.0.tgz
 npx -y tamilscript run hello.js
 ```
 
-`npm install -g /absolute/path/to/tamilscript-0.1.0.tgz` also exposes the
+`npm install -g /absolute/path/to/tamilscript-0.2.0.tgz` also exposes the
 `tamilscript` executable globally.
 
 ## Supported syntax
@@ -146,7 +152,7 @@ let mixed = $௧௦ + 20; // 30  (mixes with ASCII numbers)
 Integers above `Number.MAX_SAFE_INTEGER` are rejected, never rounded.
 `$௧n` (BigInt) produces a clear error.
 
-### Tamil decimals — `$` + Tamil digits + `.` + Tamil digits (v0.2.0)
+### Tamil decimals — `$` + Tamil digits + `.` + Tamil digits
 
 ```js
 const price = $௧௨.௫;         // 12.5
@@ -158,6 +164,26 @@ Both sides required, Tamil digits only, one separator. `$௧.5`
 (mixed scripts) is an error. Values follow IEEE 754 semantics exactly
 like ASCII decimals. Property access (`$௧.toString()`) is unaffected —
 `.` counts as a separator only before a Tamil digit.
+
+### Inclusive Tamil ranges
+
+A range is two Tamil integer literals separated by `..`; both endpoints are
+included and the result is an ordinary array expression:
+
+```js
+const oneToFive = $௧..$௫;       // [1, 2, 3, 4, 5]
+const zeroToTwo = $௦..$௨;       // [0, 1, 2]
+for (const i of $௧..$௫) {
+  // 1, 2, 3, 4, 5
+}
+```
+
+Ranges must be ascending, both endpoints must be safe integers, and a range
+may contain at most 100,000 values (a typo is diagnosed instead of allocating
+an enormous array). Decimal endpoints and mixed-script or missing-`$`
+endpoints are not range syntax and are reported as numeric diagnostics. A
+range is a numeric literal feature, so it works with or without
+`--tamil-keywords`.
 
 ### Strings are ordinary JavaScript
 
@@ -182,8 +208,9 @@ byte-for-byte untouched.
 
 ### Variables and expressions stay normal JavaScript
 
-Tamil identifiers are ordinary JavaScript identifiers — the transformer
-leaves them untouched; only `$`-prefixed literals are custom syntax.
+Tamil identifiers are ordinary JavaScript identifiers — by default the
+transformer leaves them untouched; only `$`-prefixed literals are custom
+syntax. The opt-in keyword mode described below is the sole exception.
 
 ```js
 let name = "தமிழ்";       // right: normal variable, ordinary string
@@ -195,18 +222,77 @@ Custom literals work in calls, arrays, objects, arrows, classes, loops,
 template `${...}` expressions, ESM and CommonJS. Ordinary strings,
 comments, regexes and template text are never modified.
 
+### Tamil keywords are opt-in
+
+By default every Tamil word is an ordinary JavaScript identifier. Keyword
+mode is explicit: pass `--tamil-keywords` to the CLI, `{ tamilKeywords: true
+}` to a core API, or enable `tamilscript.tamilKeywords` in the VS Code
+extension. It never turns on implicitly.
+
+```js
+const { சேர் } = require("tamilscript/runtime");
+
+செயல் கூட்டு(a, b) { கொடு a + b; }
+
+வகுப்பு வணக்கம் {
+  உருவாக்கு(பெயர்) { இது.பெயர் = பெயர்; }
+}
+
+const எண்கள் = [];
+ஒவ்வொரு (const i of $௧..$௫) {
+  என்றால் (i % $௨ === $௦) தொடர்;
+  சேர்(எண்கள், i);
+}
+அச்சிடு(கூட்டு($௨, $௩), எண்கள்.join(","));
+```
+
+| Tamil | JavaScript | Meaning |
+| --- | --- | --- |
+| `என்றால்` | `if` | conditional |
+| `இல்லை` | `else` | alternative branch |
+| `நிறுத்து` | `break` | break a loop/switch |
+| `தொடர்` | `continue` | next loop iteration |
+| `ஒவ்வொரு` | `for` | loop header |
+| `செயல்` | `function` | function declaration/expression |
+| `கொடு` | `return` | return a value |
+| `வகுப்பு` | `class` | class declaration/expression |
+| `உருவாக்கு` | `constructor` | class constructor method |
+| `இது` | `this` | current object |
+| `மேல்` | `super` | parent class |
+| `சேர்தல்` | `extends` | class inheritance |
+
+Implemented words are reserved in keyword mode: declaring `const என்றால் = 1`
+maps to the invalid `const if = 1` and `validate()`/`check` reports it.
+Property names keep their spelling: `obj.என்றால்`, private `#தனி`, object keys
+such as `{ என்றால்: 1 }`, class fields (including semicolonless fields without
+initializers), and ordinary class/object method names are not rewritten, so
+property access stays consistent. `உருவாக்கு(...)` is the intentional
+constructor-member exception only when it is a bare class constructor; an
+object literal method with the same spelling is preserved.
+
+These proposed words are **not implemented** and remain ordinary identifiers:
+`செயல்படுத்து` (`implements`), `பொது` (`public`), `தனி` (`private`),
+`இடைமுகம்` (`interface`), `எண்ணகம்` (`enum`), `வெற்று` (`void`), and
+`தொகுப்பு` (`package`). They need class/type/module grammar that TamilScript
+does not have; silently erasing them would change program meaning.
+
+`சேர்`, `நீளம்`, `எண்`, and `சொல்` are explicit runtime helpers, not keywords;
+see [Runtime helpers](#runtime-helpers).
+
 Full grammar: [docs/SYNTAX.md](docs/SYNTAX.md).
 
 ## API
 
 ```js
-import { toNumber, toTamilNumerals, transform, transformFile } from "tamilscript";
+import { toNumber, toTamilNumerals, transform, transformFile, validate } from "tamilscript";
 
 toNumber("௧௨௩");            // 123
 toTamilNumerals(123);       // "௧௨௩"
-parseTamilDecimal("௧.௫");   // 1.5  (v0.2.0)
-toTamilDecimal(1.5);        // "௧.௫" (v0.2.0)
+parseTamilDecimal("௧.௫");   // 1.5
+toTamilDecimal(1.5);        // "௧.௫"
 transform("let a = $௧௮;");  // "let a = 18;" (never executes)
+validate("let a = ;");      // { ok: false, diagnostic: { line: 1, column: 9, ... } }
+validate("என்றால் (true) {}", { tamilKeywords: true }); // syntax-only, never executes
 
 await transformFile("in.js", "out.js"); // file variant, never overwrites input
 ```
@@ -215,7 +301,7 @@ Full reference: [docs/API.md](docs/API.md).
 
 ## Tamil print helper
 
-`அச்சிடு()` is the first official Tamil helper method in TamilScript. It
+`அச்சிடு()` is the automatically installed Tamil print helper. It
 behaves like `console.log()` for the arguments it receives: zero, one, or
 many arguments of any kind (Tamil or English strings, numbers, objects,
 arrays), with identical formatting. Formatting errors propagate exactly as
@@ -251,8 +337,8 @@ import { அச்சிடு } from "tamilscript/runtime";
 ```
 
 Importing the runtime installs no globals and modifies no built-ins. Only
-`அச்சிடு()` is provided in this release; additional Tamil helpers may be
-considered in future releases, but none are included now.
+`அச்சிடு()` is installed automatically by `run`; the four explicit helpers
+below are exported from the same runtime entry point but never become globals.
 
 ### Compatibility and limits
 
@@ -266,12 +352,42 @@ considered in future releases, but none are included now.
 - `tamilscript check` validates programs using `அச்சிடு()` without
   executing them.
 
+### Runtime helpers
+
+Four explicit helpers ship alongside `அச்சிடு` in `tamilscript/runtime`.
+They are ordinary exports, not keywords and not globals:
+
+```js
+const { சேர், நீளம், எண், சொல் } = require("tamilscript/runtime");
+
+const values = சேர்([1, 2], 3); // appends in place, returns the array
+நீளம்(values);                  // 3
+எண்("௧௮");                      // 18 (also "$௧.௫" -> 1.5)
+எண்("-$௧௮");                    // -18 (optional leading + or -)
+சொல்(18);                       // "18"
+```
+
+- `சேர்(collection, ...values)` appends to an Array or Set and returns the same
+  collection. Other values throw `TypeError`; it never silently replaces an
+  immutable value.
+- `நீளம்(value)` returns a numeric `.length` or `.size`; it throws for values
+  without either.
+- `எண்(value)` uses the Tamil integer/decimal parser for Tamil strings,
+  including an optional leading `+`/`-` sign, and JavaScript `Number()`
+  coercion for everything else.
+- `சொல்(value)` uses JavaScript `String()` coercion.
+
+The `tamilscript run` prelude installs only `அச்சிடு`. Import these helpers
+explicitly (or use the REPL, where the same explicit import is available).
+
 ## CLI
 
 ```bash
 npx -y tamilscript run program.js -- arg1 arg2   # transform + execute
-npx -y tamilscript run --watch program.js        # rerun on changes (v0.2.0)
+npx -y tamilscript run --watch program.js        # rerun on changes
 npx -y tamilscript run --inspect program.js      # Node.js inspector for the run
+npx -y tamilscript --tamil-keywords run program.ot.js  # opt-in Tamil keywords
+npx -y tamilscript --tamil-keywords check program.ot.js
 npx -y tamilscript transform input.js -o output.js  # transform only
 npx -y tamilscript transform input.js --explain -o output.js  # literal report
 npx -y tamilscript check program.js              # validate, don't execute
@@ -297,8 +413,12 @@ reports only high-confidence problems — `OT001` malformed TamilScript
 literals, `OT002` JavaScript syntax errors in the transformed output via
 `node --check` — one problem per file, `node_modules`/`.git` skipped.
 `repl` gives an interactive session on the same transformer (no `eval`, no
-second engine; see `docs/LIMITATIONS.md` for its honest scope). Full
-reference: [docs/CLI.md](docs/CLI.md).
+second engine; see `docs/LIMITATIONS.md` for its honest scope).
+`--tamil-keywords` is a global opt-in for `run`, `transform`, `check`,
+`format`, `lint`, and `repl`; `TAMILSCRIPT_KEYWORDS=1` enables the same mode
+for tools that cannot pass flags. It must appear before `--`; arguments after
+`--` are forwarded to the program untouched. Full reference:
+[docs/CLI.md](docs/CLI.md).
 
 `init` writes `package.json`, `README.md`, `src/app.ot.js`, and
 `test/app.test.js`; it refuses to overwrite existing files without
@@ -310,7 +430,8 @@ traces and `cause` chains, and add accurate hints for known error codes.
 ## Transform vs run
 
 - **Transform** (`transform()`, `transformFile()`, `tamilscript transform`)
-  rewrites `$`-literals into plain JavaScript and never executes anything.
+  rewrites `$`-literals (and, when opted in, Tamil keywords) into plain
+  JavaScript and never executes anything.
   Use it to inspect output, build artifacts, or validate syntax.
 - **Run** (`runFile()`, `tamilscript run`) transforms the entry file *plus*
   its relative JS dependencies into temp siblings, then executes the result
@@ -341,6 +462,11 @@ relative `import`/`require` of other TamilScript files.
   `$"…"` / `$'…'` string form (`JST_TAMIL_STRING_REMOVED`), `$௧.5`, `$௧n`,
   `$௧abc`. `formatDiagnostic(err, { source })` renders `file:line:col` +
   snippet output.
+- `validate()` returns a diagnostic instead of throwing: malformed
+  TamilScript keeps its `JST_*` code, while a transformed-JavaScript parse
+  failure uses `JST_JAVASCRIPT_SYNTAX`; both locations are 1-based and mapped
+  back through keyword/range replacements. It is syntax-only and never
+  executes code.
 - `TamilScriptError` and `TamilScriptSyntaxError` are exported aliases of
   `JsTamilError` and `JsTamilSyntaxError` (same constructors, so both
   `instanceof` checks work). The historical names and `JST_*` codes remain
@@ -366,9 +492,11 @@ relative `import`/`require` of other TamilScript files.
 
 ## Limitations
 
-Decimals are IEEE 754 doubles; integer safe-range enforced;
-static-specifier dependency rewriting; source maps with line accuracy;
-watch mode with documented kill semantics; the formatter is
+Decimals are IEEE 754 doubles; integer safe-range enforced; Tamil keywords
+are opt-in and reserved only in that mode; ranges are ascending, inclusive,
+and capped at 100,000 values; `validate()` is syntax-only (no type checker or
+module resolver); static-specifier dependency rewriting; source maps with
+line accuracy; watch mode with documented kill semantics; the formatter is
 whitespace-only (not a pretty-printer); the linter is deliberately
 two-rule (no type or semantic analysis); the REPL has no top-level
 `await`, promise unwrapping, or `.load`. See
@@ -387,12 +515,14 @@ Because syntax highlighting cannot change what VS Code's built-in
 TypeScript validator accepts, valid `$`-literals would otherwise keep its
 red squiggles in `javascript` mode. The extension therefore switches a
 document (saved file, unsaved buffer, or remote/virtual-workspace file)
-that contains TamilScript literals to the dedicated `tamilscript` language
-mode (setting `tamilscript.autoLanguageMode`, default on), where only the
-extension's transformer-backed diagnostics apply; `*.ot.js` files open in
-that mode directly. Detection is transformer-backed, file contents are
-never touched, and switching a document back to JavaScript is respected
-for the session. See `vscode-extension/README.md` for trade-offs.
+that contains TamilScript literals (or enabled Tamil keywords) to the
+dedicated `tamilscript` language mode (setting
+`tamilscript.autoLanguageMode`, default on), where only the extension's
+transformer-backed diagnostics apply; `*.ot.js` files open in that mode
+directly. Detection is transformer-backed, file contents are never touched,
+and switching a document back to JavaScript is respected for the session.
+The extension's optional `tamilscript.tamilKeywords` setting defaults to
+off. See `vscode-extension/README.md` for trade-offs.
 
 ## Development
 
@@ -402,9 +532,11 @@ npm test            # full suite via scripts/run-tests.js
 node bin/tamilscript.js run examples/basic.js
 ```
 
-Project layout: `src/` (lexer, numerals, transformer, sourcemap,
-imports, runner, watch, repl, format, lint, CLI), `bin/tamilscript.js`,
-`test/`, `examples/`, `bench/`, `scripts/`, `docs/`. Zero runtime dependencies.
+Project layout: `src/` (lexer, numerals, keyword registry, transformer,
+sourcemap, validation, runtime helpers, imports, runner, watch, repl, format,
+lint, CLI), `bin/tamilscript.js`, `test/`, `examples/`, `bench/`, `scripts/`,
+`docs/`. One runtime dependency: Acorn, used only by parser-backed
+`validate()`.
 
 ## Test instructions
 
@@ -413,17 +545,22 @@ npm test                  # full suite via scripts/run-tests.js
 node bench/bench.js --quick  # benchmark smoke run
 ```
 
-428 tests across numerals, decimals, transformer, lexical contexts,
-diagnostics, source maps, API stability, CLI, ESM, CommonJS, dependency
-rewriting, hardening, watch mode, print helper, REPL, formatter, linter,
-edge cases and examples — all must pass. The extension has its own suite
-(`vscode-extension/`, 102 tests) plus a real-editor integration run.
+523 tests across numerals, decimals, inclusive ranges, transformer, keyword
+registry/mode, lexical contexts, diagnostics, source maps, validation, runtime
+helpers, API stability, CLI, ESM, CommonJS, dependency rewriting, hardening,
+watch mode, print helper, REPL, formatter, linter, edge cases and examples —
+all must pass. The extension has its own suite (`vscode-extension/`, 106
+tests); real VS Code host integration is a separate manual check.
 
-## Packaging and publishing (later, not done yet)
+## Packaging and publishing (maintainer only)
+
+`tamilscript@0.1.0` is the previously published registry release. This
+checkout prepares `0.2.0`; do not describe it as published until the reviewed
+tarball is published by a maintainer.
 
 ```bash
 npm pack --dry-run   # verify contents
-npm publish          # maintainer only, when ready
+npm publish          # maintainer only, after review and explicit approval
 ```
 
 ## License
@@ -432,9 +569,12 @@ MIT — see [LICENSE](LICENSE).
 
 ## Roadmap
 
-- ~~Source maps for transformed stacks~~ — done in v0.2.0 (stack traces)
+- ~~Source maps for transformed stacks~~ — done in the OpenTamizh 0.2.0
+  milestone (stack traces)
 - ~~Editor highlighting for `$`-literals~~ — done via `vscode-extension/`
   (unpublished side-load; injection grammar + opt-in language)
+- ~~Opt-in Tamil keyword aliases~~ — included in the 0.2.0 release candidate
+  with an authoritative registry; deferred words are documented
 - `BigInt` Tamil literal design (only with unambiguous syntax)
 - Loader (`--import tamilscript/loader`) so dependencies need no rewriting
 - Parser-backed formatting/pretty-printing (the current `format` normalizes

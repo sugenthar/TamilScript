@@ -93,14 +93,15 @@ function compileAs(code, expression) {
  * Decide what to do with the current buffer.
  *
  * @param {string} buffer input so far (lines joined with '\n', trailing '\n')
+ * @param {{ tamilKeywords?: boolean }} [options]
  * @returns {{ more: true } | { error: Error } | { script: vm.Script, source: string }}
  *   `more` means the input is incomplete; `error` is reportable and clears
  *   the buffer; otherwise the compiled script is ready to run.
  */
-function classify(buffer) {
+function classify(buffer, options) {
   let code;
   try {
-    code = transform(buffer);
+    code = transform(buffer, { tamilKeywords: !!(options && options.tamilKeywords) });
   } catch (err) {
     if (isIncompleteTransformError(err)) return { more: true };
     return { error: err };
@@ -291,11 +292,12 @@ function createReplContext() {
 /**
  * Run the interactive REPL until EOF / `.exit` / double Ctrl+C.
  *
- * @param {{ input?: NodeJS.ReadableStream, output?: NodeJS.WritableStream, error?: NodeJS.WritableStream }} [options]
+ * @param {{ input?: NodeJS.ReadableStream, output?: NodeJS.WritableStream, error?: NodeJS.WritableStream, tamilKeywords?: boolean }} [options]
  * @returns {Promise<number>} exit code (always 0: a session is not a run)
  */
 function runRepl(options) {
   const opts = options || {};
+  const tamilKeywords = !!opts.tamilKeywords;
   const input = opts.input || process.stdin;
   const output = opts.output || process.stdout;
   const error = opts.error || process.stderr;
@@ -390,7 +392,7 @@ function runRepl(options) {
       return;
     }
     buffer += `${line}\n`;
-    const outcome = classify(buffer);
+    const outcome = classify(buffer, { tamilKeywords });
     if (outcome.more) {
       prompt(true);
       return;

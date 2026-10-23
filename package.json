@@ -1,6 +1,6 @@
 {
   "name": "tamilscript",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "TamilScript: a Tamil-friendly JavaScript source transformer for Node.js, with Tamil numeric literals and Tamil identifiers.",
   "keywords": [
     "tamilscript",
@@ -56,7 +56,7 @@
   },
   "scripts": {
     "test": "node scripts/run-tests.js",
-    "test:unit": "node --test test/numerals.test.js test/numerals-decimal.test.js test/decimals.test.js test/transformer.test.js test/lexical-contexts.test.js test/diagnostics.test.js test/sourcemaps.test.js test/api.test.js test/api-stability.test.js test/edge-cases.test.js test/scaffold.test.js test/esm-exports.test.js test/repl.test.js test/format.test.js test/lint.test.js test/run-tests-script.test.js",
+    "test:unit": "node --test test/numerals.test.js test/numerals-decimal.test.js test/decimals.test.js test/transformer.test.js test/lexical-contexts.test.js test/diagnostics.test.js test/sourcemaps.test.js test/api.test.js test/api-stability.test.js test/edge-cases.test.js test/scaffold.test.js test/esm-exports.test.js test/keywords.test.js test/ranges.test.js test/validation.test.js test/runtime-helpers.test.js test/repl.test.js test/format.test.js test/lint.test.js test/run-tests-script.test.js",
     "test:cli": "node --test test/cli.test.js test/esm.test.js test/commonjs.test.js test/imports.test.js test/hardening.test.js test/examples.test.js test/print-helper.test.js test/diagnostics-cli.test.js test/cli-init.test.js test/cli-advanced.test.js test/debugging.test.js test/color-output.test.js test/standalone.test.js",
     "bench": "node bench/bench.js",
     "bench:quick": "node bench/bench.js --quick"
@@ -69,5 +69,8 @@
   "bugs": {
     "url": "https://github.com/sugenthar/TamilScript/issues"
   },
-  "homepage": "https://github.com/sugenthar/TamilScript#readme"
+  "homepage": "https://github.com/sugenthar/TamilScript#readme",
+  "dependencies": {
+    "acorn": "^8.19.0"
+  }
 }

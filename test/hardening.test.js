@@ -541,6 +541,20 @@ describe('explain and source-map flags', () => {
     }
   });
 
+  it('transform --explain totals include range and keyword events', () => {
+    const dir = mktmp();
+    try {
+      const input = path.join(dir, 'in.ot.js');
+      const output = path.join(dir, 'out.js');
+      fs.writeFileSync(input, 'let a = $\u0BE7..$\u0BE9;\n\u0B8E\u0BA9\u0BCD\u0BB1\u0BBE\u0BB2\u0BCD (true) {}\n', 'utf8');
+      const r = cli(['transform', input, '--tamil-keywords', '--explain', '-o', output]);
+      assert.equal(r.status, 0, `stderr: ${r.stderr}`);
+      assert.match(r.stdout, /Transformed 2 literals: 0 number, 0 decimal, 1 range, 1 keyword\./);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('transform --explain never dumps ordinary string contents', () => {
     const dir = mktmp();
     try {

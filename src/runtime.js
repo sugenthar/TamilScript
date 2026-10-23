@@ -24,6 +24,7 @@
 //   import { அச்சிடு } from 'tamilscript/runtime';
 
 const { Console } = require('node:console');
+const { சேர், நீளம், எண், சொல் } = require('./helpers/tamil-helpers');
 
 const PRINT_HELPER_NAME = '\u0b85\u0b9a\u0bcd\u0b9a\u0bbf\u0b9f\u0bc1';
 
@@ -41,4 +42,4 @@ const plainConsole = new Console({
 
 const அச்சிடு = (...args) => plainConsole.log(...args);
 
-module.exports = { அச்சிடு, PRINT_HELPER_NAME };
+module.exports = { அச்சிடு, சேர், நீளம், எண், சொல், PRINT_HELPER_NAME };

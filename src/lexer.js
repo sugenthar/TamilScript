@@ -2,6 +2,12 @@
 
 const { JsTamilSyntaxError, ErrorCodes } = require('./errors');
 const { isTamilDigit, tamilDigitValue } = require('./numerals');
+const {
+  getKeywordMapping,
+  keywordOptions,
+  isDottedName,
+  isPropertyNamePosition,
+} = require('./keywords');
 
 // Keywords after which a `/` starts a regex (expression expects a value).
 // Anything else that behaves like an operator/punctuation also allows regex.
@@ -20,6 +26,13 @@ const CONTROL_CONDITION_KEYWORDS = new Set([
   'if', 'while', 'for', 'switch', 'catch', 'with',
 ]);
 
+// Inclusive Tamil ranges are materialized with a self-contained array
+// expression. The expansion deliberately avoids `Array.from` and user-scope
+// identifiers so a local binding such as `const Array = ...` cannot change
+// the result. The limit keeps a typo such as `$௦..$௯௯௯௯௯௯` from asking the
+// runtime for an enormous array.
+const MAX_TAMIL_RANGE_LENGTH = 100000;
+
 /**
  * @typedef {{ line: number, column: number, filename?: string }} Location
  */
@@ -30,7 +43,7 @@ const CONTROL_CONDITION_KEYWORDS = new Set([
 class Scanner {
   /**
    * @param {string} source
-   * @param {{ filename?: string, collectEvents?: boolean }} [options]
+   * @param {{ filename?: string, collectEvents?: boolean, tamilKeywords?: boolean }} [options]
    */
   constructor(source, options) {
     this.source = source;
@@ -43,6 +56,10 @@ class Scanner {
     this.out = [];
     this.filename = options && options.filename != null ? options.filename : undefined;
     this.collectEvents = !!(options && options.collectEvents);
+    // Opt-in: Tamil words are ordinary identifiers unless the caller asks for
+    // keyword mode. The registry owns the word list; the scanner only applies
+    // the mapping while tracking JavaScript lexical context.
+    this.tamilKeywords = keywordOptions(options).tamilKeywords;
     // this.column tracks SOURCE positions (1-based UTF-16 units) for error
     // locations, explain events and map source columns. Output columns (for
     // map generated columns) are tracked separately via outLineLen, because
@@ -294,11 +311,13 @@ class Scanner {
     return ch >= '0' && ch <= '9';
   }
 
-  markWord(word) {
+  markWord(word, dottedOverride) {
     // A keyword used as a property name (`obj.if(...)`) or private name
     // (`this.#if(...)`) must not open a control-condition context.
     const before = this.source[this.i - word.length - 1];
-    const dotted = before === '.' || before === '#';
+    const dotted = dottedOverride !== undefined
+      ? !!dottedOverride
+      : before === '.' || before === '#';
     this.lastWord = dotted ? null : word;
     if (dotted) {
       this.maybeForAwait = false;
@@ -313,7 +332,15 @@ class Scanner {
       this.maybeForAwait = false;
       this.forAwaitPending = false;
     }
-    if (REGEX_ALLOWED_KEYWORDS.has(word)) {
+    // A dotted name is a property access or private-name reference
+    // (`obj.if / 2`, `obj.await / 2`, `this.#do / 2`): the word there is an
+    // ordinary identifier and always completes an operand, so a following
+    // `/` is division. It must not re-enter keyword classification, which
+    // would read that `/` as the start of a regex literal and either reject
+    // valid JavaScript or silently corrupt the operator.
+    if (dotted) {
+      this.lastSignificant = 'value';
+    } else if (REGEX_ALLOWED_KEYWORDS.has(word)) {
       this.lastSignificant = 'operator';
     } else if (VALUE_KEYWORDS.has(word)) {
       this.lastSignificant = 'value';
@@ -324,9 +351,9 @@ class Scanner {
     return dotted;
   }
 
-  /** Remember the previous significant token for brace classification. */
+  /** Remember the previous significant token for brace/keyword context. */
   noteToken(type, value) {
-    this.lastToken = { type, value };
+    this.lastToken = { type, value, endLine: this.line, endIndex: this.i };
   }
 
   /**
@@ -473,6 +500,7 @@ class Scanner {
         close: cls.expression ? 'value' : 'operator',
         blockContent: false,
         statementAfter: !cls.expression,
+        classBody: true,
       };
     }
     const prev = this.lastToken;
@@ -505,6 +533,16 @@ class Scanner {
       if (prev.value === 'else' || prev.value === 'try' || prev.value === 'finally' ||
           prev.value === 'do' || prev.value === 'catch') {
         return { close: 'operator', blockContent: true, statementAfter: true };
+      }
+      if (prev.value === 'static') {
+        // `class C { static { ... } }`: a static initialization block is a
+        // statement list, not the body of a static field/method.
+        const frame = this.braceStack.length > 0
+          ? this.braceStack[this.braceStack.length - 1]
+          : null;
+        if (frame && frame.classBody) {
+          return { close: 'operator', blockContent: true, statementAfter: true };
+        }
       }
     }
     // At a statement start a bare `{` is always a block statement (an object
@@ -611,6 +649,13 @@ class Scanner {
     if (ch === '$') {
       const next = this.peek(1);
       if (next && isTamilDigit(next)) {
+        if (this.scanTamilRange()) {
+          this.lastSignificant = 'value';
+          this.atStatementStart = false;
+          this.labelCandidate = null;
+          this.noteToken('value', null);
+          return true;
+        }
         this.scanTamilNumber();
         this.lastSignificant = 'value';
         this.atStatementStart = false;
@@ -811,6 +856,7 @@ class Scanner {
         close: info.close,
         blockContent: info.blockContent,
         statementAfter: info.statementAfter,
+        classBody: !!info.classBody,
         fnDepth: this.pendingFunctions.length,
         clsDepth: this.pendingClasses.length,
       });
@@ -956,14 +1002,42 @@ class Scanner {
   }
 
   scanWord() {
-    let word = '';
-    // handle unicode escape starts like \u0041 — just copy through
+    const startI = this.i;
+    const startLine = this.line;
+    const startCol = this.column;
+    const outStart = this.outLineLen;
+    let sourceWord = '';
+    // Identifiers never contain line breaks, so advancing the source cursor
+    // manually is safe and lets us decide on a whole-word replacement before
+    // emitting anything.
     while (this.i < this.length && this.isIdentifierPart(this.source[this.i])) {
-      word += this.source[this.i];
-      this.emit(this.source[this.i]);
+      sourceWord += this.source[this.i];
+      this.i += 1;
+      this.column += 1;
     }
-    const dotted = this.markWord(word);
-    return { word, dotted };
+    const dotted = isDottedName(this.source, startI, this.lastToken);
+    const frame = this.braceStack.length > 0
+      ? this.braceStack[this.braceStack.length - 1]
+      : null;
+    const nextIndex = this.nextSignificantIndex(this.i);
+    const candidate = this.tamilKeywords && !dotted ? getKeywordMapping(sourceWord) : null;
+    const propertyName = isPropertyNamePosition(this.source, startI, {
+      nextSignificant: nextIndex < this.length ? this.source[nextIndex] : '',
+      previousToken: this.lastToken,
+      lineBreakBefore: !!(this.lastToken && startLine > this.lastToken.endLine),
+      lineBreakAfter: /[\r\n\u2028\u2029]/.test(this.source.slice(this.i, nextIndex)),
+      inNonBlockBrace: !!(frame && !frame.blockContent),
+      inClassBody: !!(frame && frame.classBody),
+      memberKeyword: !!(candidate && candidate.role === 'member'),
+    });
+    const mapping = candidate && !propertyName ? candidate : null;
+    const word = mapping ? mapping.js : sourceWord;
+    this.pushMapped(word);
+    if (mapping) {
+      this.recordReplacement('keyword', startI, startLine, outStart + 1, startCol, word);
+    }
+    this.markWord(word, dotted);
+    return { word, sourceWord, dotted, keyword: mapping };
   }
 
   scanAsciiNumber() {
@@ -1304,10 +1378,146 @@ class Scanner {
     return false;
   }
 
+  /**
+   * Read a run of Tamil digits without emitting anything.
+   * @param {number} index index of the first digit (just after `$`)
+   * @returns {{ digits: string, value: number, end: number, safe: boolean } | null}
+   */
+  readTamilInteger(index) {
+    let digits = '';
+    let value = 0;
+    let i = index;
+    let safe = true;
+    while (i < this.length && isTamilDigit(this.source[i])) {
+      const digit = tamilDigitValue(this.source[i]);
+      digits += this.source[i];
+      value = value * 10 + digit;
+      if (value > Number.MAX_SAFE_INTEGER) safe = false;
+      i += 1;
+    }
+    if (digits.length === 0) return null;
+    return { digits, value, end: i, safe };
+  }
+
+  /**
+   * Scan an inclusive integer range literal: `$௧..$௫` becomes an array
+   * expression. Both endpoints are Tamil integer literals, the range must be
+   * ascending, and the result includes both endpoints. A two-dot form with a
+   * Tamil or ASCII digit that lacks the second `$` is a likely range typo, so
+   * it is diagnosed instead of being emitted as `1..5`.
+   * @returns {boolean} true when a range was consumed
+   */
+  scanTamilRange() {
+    const startI = this.i;
+    const startLine = this.line;
+    const startCol = this.column;
+    const outStart = this.outLineLen;
+    const first = this.readTamilInteger(startI + 1);
+    if (!first) return false;
+    const dot = first.end;
+    if (this.source[dot] !== '.' || this.source[dot + 1] !== '.') {
+      return false;
+    }
+    const afterDots = this.source[dot + 2] || '';
+    if (afterDots !== '$' || !isTamilDigit(this.source[dot + 3])) {
+      if (afterDots >= '0' && afterDots <= '9') {
+        throw this.err(
+          `Mixed Tamil/ASCII range endpoint "$${first.digits}..${afterDots}": both endpoints must be Tamil integer literals (e.g. "$${first.digits}..$௫").`,
+          startLine, startCol + (dot + 2 - startI), ErrorCodes.MIXED_TAMIL_NUMBER
+        );
+      }
+      if (afterDots === '$') {
+        const afterDollar = this.source[dot + 3] || '';
+        if (afterDollar >= '0' && afterDollar <= '9') {
+          let ascii = '';
+          let k = dot + 3;
+          while (this.source[k] >= '0' && this.source[k] <= '9') {
+            ascii += this.source[k];
+            k += 1;
+          }
+          throw this.err(
+            `Mixed Tamil/ASCII range endpoint "$${first.digits}..$${ascii}": the digits after "$" must be Tamil (e.g. "$${first.digits}..$௫").`,
+            startLine, startCol + (dot + 2 - startI), ErrorCodes.MIXED_TAMIL_NUMBER
+          );
+        }
+      }
+      if (isTamilDigit(afterDots)) {
+        throw this.err(
+          `Malformed Tamil range "$${first.digits}..${afterDots}": the second endpoint needs "$" (e.g. "$${first.digits}..$${afterDots}").`,
+          startLine, startCol + (dot + 2 - startI), ErrorCodes.BAD_TAMIL_NUMBER
+        );
+      }
+      return false;
+    }
+    const second = this.readTamilInteger(dot + 3);
+    if (!second) return false;
+    const afterSecond = this.source[second.end] || '';
+    const afterSecondDot = this.source[second.end + 1] || '';
+    if (
+      afterSecond === '.' &&
+      (isTamilDigit(afterSecondDot) || (afterSecondDot >= '0' && afterSecondDot <= '9'))
+    ) {
+      const mixed = !isTamilDigit(afterSecondDot);
+      throw this.err(
+        `Tamil range endpoints must be integers, but "$${second.digits}.${afterSecondDot}" has a decimal fraction. Use integer endpoints (e.g. "$${first.digits}..$${second.digits}").`,
+        startLine, startCol, mixed ? ErrorCodes.MIXED_TAMIL_NUMBER : ErrorCodes.BAD_TAMIL_NUMBER
+      );
+    }
+    if (!first.safe) {
+      throw this.err(
+        `Tamil numeric literal "$${first.digits}" exceeds Number.MAX_SAFE_INTEGER (${Number.MAX_SAFE_INTEGER}).`,
+        startLine, startCol, ErrorCodes.UNSAFE_INTEGER
+      );
+    }
+    if (!second.safe) {
+      throw this.err(
+        `Tamil numeric literal "$${second.digits}" exceeds Number.MAX_SAFE_INTEGER (${Number.MAX_SAFE_INTEGER}).`,
+        startLine, startCol, ErrorCodes.UNSAFE_INTEGER
+      );
+    }
+    // Match scanTamilNumber's anti-glue rule so a range cannot silently fuse
+    // with a preceding identifier or member-access dot.
+    const prevChar = startI > 0 ? this.source[startI - 1] : '';
+    const afterSpread =
+      prevChar === '.' && startI > 2 && this.source[startI - 2] === '.' && this.source[startI - 3] === '.';
+    if (prevChar !== '' && !afterSpread && (this.isIdentifierPart(prevChar) || prevChar === '.')) {
+      throw this.err(
+        `Malformed Tamil numeric literal "$${first.digits}": it must not be directly preceded by "${prevChar}". Separate it with whitespace or an operator.`,
+        startLine, startCol, ErrorCodes.BAD_TAMIL_NUMBER
+      );
+    }
+    this.checkIntBoundary(
+      second.digits,
+      this.source[second.end] || '',
+      this.source[second.end + 1] || '',
+      startLine,
+      startCol
+    );
+    if (first.value > second.value) {
+      throw this.err(
+        `Tamil range "$${first.digits}..$${second.digits}" is descending. Ranges must be inclusive and ascending (start <= end).`,
+        startLine, startCol, ErrorCodes.BAD_TAMIL_NUMBER
+      );
+    }
+    const length = second.value - first.value + 1;
+    if (length > MAX_TAMIL_RANGE_LENGTH) {
+      throw this.err(
+        `Tamil range "$${first.digits}..$${second.digits}" contains ${length} values; the maximum is ${MAX_TAMIL_RANGE_LENGTH}.`,
+        startLine, startCol, ErrorCodes.BAD_TAMIL_NUMBER
+      );
+    }
+    const emitted = `(() => { const values = []; for (let i = 0; i < ${length}; i++) values[i] = ${first.value} + i; return values; })()`;
+    this.i = second.end;
+    this.column = startCol + (second.end - startI);
+    this.pushMapped(emitted);
+    this.recordReplacement('range', startI, startLine, outStart + 1, startCol, emitted);
+    return true;
+  }
+
   scanTamilNumber() {
     // Positioned at `$`, next char is a Tamil digit.
     //
-    // Grammar (v0.2.0):
+    // Grammar (OpenTamizh 0.2.0 milestone):
     //   TamilInteger := '$' TamilDigit+
     //   TamilDecimal := '$' TamilDigit+ '.' TamilDigit+
     // The '.' is a decimal separator ONLY when immediately followed by a

@@ -69,6 +69,24 @@ describe('sourcemap: map structure', () => {
     ]);
   });
 
+  it('maps keyword and range replacements back to original columns', () => {
+    const keywordSource = 'என்றால் (true) { const xs = $௧..$௫; }\n';
+    const keywordResult = transformWithMap(keywordSource, { tamilKeywords: true });
+    assert.equal(
+      keywordResult.code,
+      'if (true) { const xs = (() => { const values = []; for (let i = 0; i < 5; i++) values[i] = 1 + i; return values; })(); }\n'
+    );
+    const keywordLine = decodeMappings(keywordResult.map.mappings)[0];
+    const afterKeyword = keywordLine.find((segment) => segment.gen === 2);
+    assert.equal(afterKeyword.srcCol, keywordSource.indexOf(' '));
+
+    const rangeSource = 'const xs = $௧..$௫; const y = 1;\n';
+    const rangeResult = transformWithMap(rangeSource);
+    const rangeLine = decodeMappings(rangeResult.map.mappings)[0];
+    const afterRange = rangeLine.find((segment) => segment.gen === rangeResult.code.indexOf('; const y'));
+    assert.equal(afterRange.srcCol, rangeSource.indexOf(';'));
+  });
+
   it('maps decimal literal columns exactly outside replaced spans', () => {
     const source = 'let b = $௩.௫;\n';
     const { code, map } = transformWithMap(source, { filename: 'ex.js' });

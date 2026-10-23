@@ -163,3 +163,117 @@ describe('lexical contexts are preserved', () => {
     }
   });
 });
+
+describe('dotted reserved-word names keep division semantics', () => {
+  const { execFileSync } = require('node:child_process');
+
+  // Run transformed output in a fresh Node process so the assertions check
+  // actual runtime semantics, not just that the transformer did not throw.
+  function runNode(code) {
+    return execFileSync(process.execPath, ['-e', code], { encoding: 'utf8' }).trim();
+  }
+
+  it('divides by a dotted reserved-word property name (regression)', () => {
+    // Before the markWord() fix these were misparsed as regex starts and
+    // raised "Unterminated regular expression literal".
+    const cases = [
+      'obj.await / 2',
+      'obj.do / 2',
+      'obj.in / 2',
+      'obj.if / 2',
+      'obj.of / 2',
+      'obj.as / 2',
+      'obj.else / 2',
+      'obj.new / 2',
+      'obj.delete / 2',
+      'obj.void / 2',
+      'obj.typeof / 2',
+      'obj.throw / 2',
+      'obj.return / 2',
+      'obj.yield / 2',
+    ];
+    for (const expr of cases) {
+      const name = expr.split('.')[1].split(' ')[0];
+      const src = `const obj = { ${name}: 10 };\nlet q = ${expr};`;
+      assert.equal(transform(src), src, JSON.stringify(src));
+      assert.equal(runNode(transform(src) + '\nconsole.log(q);'), '5', JSON.stringify(expr));
+    }
+  });
+
+  it('divides by obj.in inside arithmetic (regression)', () => {
+    const src = 'const obj = { in: 10 };\nlet q = obj.in / 2 + 1;';
+    assert.equal(transform(src), src);
+    assert.equal(runNode(transform(src) + '\nconsole.log(q);'), '6');
+  });
+
+  it('a later slash cannot turn an earlier division into a regex (regression)', () => {
+    // Before the fix the lexer consumed `/ 2; … /` as one regex literal,
+    // silently preserving byte-identical output while changing semantics.
+    const src = 'let a = { await: 10 };\nlet q = a.await / 2;\nlet r = /ab+c/.test("xabcy");';
+    assert.equal(transform(src), src);
+    assert.equal(runNode(transform(src) + '\nconsole.log(q, r);'), '5 true');
+  });
+
+  it('divides by several dotted reserved-word properties in one expression', () => {
+    const src = 'const obj = { do: 3, if: 4, in: 5 };\nlet q = obj.do + obj.if + obj.in;';
+    assert.equal(transform(src), src);
+    assert.equal(runNode(transform(src) + '\nconsole.log(q);'), '12');
+  });
+
+  it('divides after optional chaining and computed access with reserved names', () => {
+    const optionalSrc = 'const obj = { do: 10 };\nlet q = obj?.do / 2;';
+    assert.equal(transform(optionalSrc), optionalSrc);
+    assert.equal(runNode(transform(optionalSrc) + '\nconsole.log(q);'), '5');
+
+    const computedSrc = 'const obj = { do: 10 };\nlet q = obj["do"] / 2;';
+    assert.equal(transform(computedSrc), computedSrc);
+    assert.equal(runNode(transform(computedSrc) + '\nconsole.log(q);'), '5');
+  });
+
+  it('divides by an object-private field named like a keyword', () => {
+    const src = [
+      'class C {',
+      '  #do = 10;',
+      '  half() { return this.#do / 2; }',
+      '}',
+      'console.log(new C().half());',
+    ].join('\n');
+    assert.equal(transform(src), src);
+    assert.equal(runNode(transform(src)), '5');
+  });
+
+  it('real regex literals after genuine keywords still work', () => {
+    assert.equal(transform('return /re/.test(s);'), 'return /re/.test(s);');
+    assert.equal(transform('throw /x/;'), 'throw /x/;');
+    assert.equal(transform('else /re/;'), 'else /re/;');
+    assert.equal(
+      runNode(transform("function test(){ return /re/.test('re'); }\nconsole.log(test());")),
+      'true'
+    );
+    assert.equal(
+      runNode(transform("function test(){ return /\\bre\\b/.test('a re b'); }\nconsole.log(test());")),
+      'true'
+    );
+    assert.equal(
+      runNode(transform("function test(){ return /\\bre\\b/.test('xreb'); }\nconsole.log(test());")),
+      'false'
+    );
+    assert.equal(
+      runNode(transform("function test(){ return /\\bre\\b/.test('re'); }\nconsole.log(test());")),
+      'true'
+    );
+  });
+
+  it('ordinary division and nested expressions stay unchanged', () => {
+    const samples = [
+      'let q = a / b;',
+      'let q = (a) / b;',
+      'let q = obj.await / obj.in;',
+      'let q = ((a.do + b.if) * c.in) / (d.else + 1);',
+    ];
+    for (const s of samples) {
+      assert.equal(transform(s), s, JSON.stringify(s));
+    }
+    assert.throws(() => transform('/ 2'), /Unterminated regular expression literal/);
+  });
+});

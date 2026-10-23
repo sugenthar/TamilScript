@@ -25,7 +25,7 @@ describe('ESM named exports', () => {
     const re = /^export (?:declare )?(?:const|function|class) ([^\s(:<]+)/gm;
     let m;
     while ((m = re.exec(dts)) !== null) declared.push(m[1]);
-    assert.equal(declared.length, 20, `declared runtime exports changed: ${declared.join(', ')}`);
+    assert.equal(declared.length, 21, `declared runtime exports changed: ${declared.join(', ')}`);
     assert.ok(declared.includes('அச்சிடு'), 'Tamil helper must stay part of the API');
     const script = [
       "import * as ns from 'tamilscript';",
@@ -53,7 +53,7 @@ describe('ESM named exports', () => {
       'transform', 'transformWithMap', 'transformWithMeta', 'transformFile',
       'runFile', 'checkFile', 'inlineSourceMapComment', 'errors',
       'ErrorCodes', 'formatDiagnostic', 'JsTamilError', 'JsTamilSyntaxError',
-      'TamilScriptError', 'TamilScriptSyntaxError', 'அச்சிடு', 'VERSION',
+      'TamilScriptError', 'TamilScriptSyntaxError', 'அச்சிடு', 'validate', 'VERSION',
     ];
     const r = node(['-e', 'console.log(JSON.stringify(Object.keys(require("tamilscript"))))']);
     assert.equal(r.status, 0, r.stderr);

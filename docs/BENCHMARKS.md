@@ -37,20 +37,21 @@ node bench/bench.js --quick   # CI smoke (5 iterations per case)
 
 ## Reference run (example — your numbers will differ)
 
-Recorded on Windows 11 x64, Node v24.11.1, `--quick` (5 iterations),
-idle developer machine — shown only to prove the harness runs, not as a
-performance claim:
+Recorded on Windows 11 x64, Node v24.11.1, `--quick` (5 iterations), on the
+current developer machine; load and timing vary, so these numbers are only a
+smoke-test reference, not a performance claim:
 
 ```text
-small (20 lines, mixed): 0.5KiB, median ~0.4ms
-medium plain (200 lines, no literals): 3.4KiB, median ~0.5ms
-medium numbers (200 lines): 6.3KiB, median ~0.8ms
-medium strings (200 lines, ordinary): 12.1KiB, median ~3.8ms
-medium decimals (200 lines): 4.8KiB, median ~1.2ms
-nested templates (20x depth-8): 2.8KiB, median ~0.3ms
-large (numbers x10): 63.0KiB, median ~9.4ms
+small (20 lines, mixed): 0.5KiB, median ~1.35ms
+medium plain (200 lines, no literals): 3.4KiB, median ~3.29ms
+medium numbers (200 lines): 6.3KiB, median ~2.12ms
+medium strings (200 lines, ordinary): 11.9KiB, median ~2.45ms
+medium decimals (200 lines): 4.8KiB, median ~3.35ms
+nested templates (20x depth-8): 2.8KiB, median ~1.52ms
+large (numbers x10): 63.0KiB, median ~26.12ms
 ```
 
-Transform cost is roughly linear in input size (single pass); string
-literals cost more per byte than numbers because values are decoded and
-re-encoded.
+Transform cost is roughly linear in input size (single pass). Ordinary string
+bodies are copied through as protected spans, not decoded and re-encoded; the
+string case is larger in bytes and includes scanner overhead, so compare
+per-KiB rates rather than raw totals.

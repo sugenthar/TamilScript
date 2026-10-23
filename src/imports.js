@@ -653,7 +653,13 @@ async function tempExtensionFor(absPath, transformed) {
   if (ext === '.mjs') return '.mjs';
   if (ext === '.cjs') return '.cjs';
   const pkgType = await findPackageType(path.dirname(path.resolve(absPath)));
+  // An explicit package type wins, exactly like Node: .js stays .js under
+  // both "module" and "commonjs". Those files keep their declared semantics,
+  // so an ESM-only construct in a CommonJS-typed package remains a genuine
+  // syntax error instead of being silently reinterpreted as ESM.
   if (pkgType === 'module' || pkgType === 'commonjs') return '.js';
+  // No package.json type applies: sniff the transformed source. ESM is chosen
+  // only when the CommonJS wrapper parse fails.
   return canParseAsCommonJS(transformed) ? '.cjs' : '.mjs';
 }
 
@@ -681,14 +687,19 @@ async function tempBasenameFor(absPath, transformed) {
  *
  * @param {string} entryAbs absolute path of the entry source file
  * @param {string} entryTransformed already-transformed entry source
- * @param {{ entrySource?: string, withMaps?: boolean }} [options]
+ * @param {{ entrySource?: string, withMaps?: boolean, tamilKeywords?: boolean }} [options]
  *   `entrySource` is the original entry text (needed for source maps);
  *   `withMaps` appends an inline source map to every temp file so stack
- *   traces point at the original files.
+ *   traces point at the original files; `tamilKeywords` enables the opt-in
+ *   keyword aliases for every transformed file in the tree.
  */
 async function buildTransformedTree(entryAbs, entryTransformed, options) {
   const opts = options || {};
   const withMaps = !!opts.withMaps;
+  const transformOptions = (absPath) => ({
+    filename: absPath,
+    tamilKeywords: !!opts.tamilKeywords,
+  });
   const mapping = new Map(); // absPath -> tempBasename (reserved before recursing: cycle-safe)
   const tempFiles = [];
   const sources = []; // every original file transformed (entry first)
@@ -702,9 +713,13 @@ async function buildTransformedTree(entryAbs, entryTransformed, options) {
 
   async function transformOne(absPath, source) {
     if (!withMaps) {
-      return { code: transform(source, { filename: absPath }), map: null, replacements: [] };
+      return {
+        code: transform(source, transformOptions(absPath)),
+        map: null,
+        replacements: [],
+      };
     }
-    const r = transformWithMap(source, { filename: absPath });
+    const r = transformWithMap(source, transformOptions(absPath));
     return r; // { code, map, replacements }
   }
 
@@ -720,7 +735,7 @@ async function buildTransformedTree(entryAbs, entryTransformed, options) {
     if (known) {
       source = known.source;
       first = withMaps
-        ? transformWithMap(source, { filename: absPath })
+        ? transformWithMap(source, transformOptions(absPath))
         : { code: known.code, map: null, replacements: [] };
     } else {
       try {

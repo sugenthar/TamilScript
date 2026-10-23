@@ -34,6 +34,7 @@ const EXPECTED_EXPORTS = [
   'TamilScriptSyntaxError',
   'VERSION',
   'அச்சிடு',
+  'validate',
 ];
 
 describe('api stability', () => {
@@ -102,42 +103,63 @@ describe('api stability', () => {
   });
 
   it('packed tarball contains code, declarations, binary, docs, examples and license', () => {
-    // Single fixed command string (no interpolated input): safe with shell.
-    const r = spawnSync('npm pack --dry-run --json', {
-      encoding: 'utf8',
-      cwd: ROOT,
-      shell: true,
-    });
-    assert.equal(r.status, 0, r.stderr);
-    const parsed = JSON.parse(r.stdout);
-    const files = (parsed[0] && parsed[0].files || parsed.files || []).map((f) => f.path || f);
-    const names = files.map(String);
-    for (const want of [
-      'src/index.js',
-      'src/index.d.ts',
-      'src/lexer.js',
-      'src/numerals.js',
-      'src/sourcemap.js',
-      'src/watch.js',
-      'src/runtime.js',
-      'src/runtime.d.ts',
-      'src/register.js',
-      'bin/tamilscript.js',
-      'package.json',
-      'README.md',
-      'CHANGELOG.md',
-      'MIGRATION.md',
-      'LICENSE',
-      'examples/basic.js',
-      'examples/print-explicit.js',
-      'examples/commonjs/main.js',
-      'examples/esm/main.js',
-    ]) {
-      assert.ok(names.includes(want), `tarball missing ${want}; got ${names.join(', ')}`);
+    // Pack a snapshot, not the live checkout: run/check tests create short-lived
+    // `tamilscript-*` sibling files while this test runs, and npm's walk can see
+    // one before the owner deletes it (ENOENT during pack).
+    const snapshot = fs.mkdtempSync(path.join(os.tmpdir(), 'tamilscript-pack-'));
+    const transient = /^tamilscript-.*-\d+-\d+-[0-9a-f]{8}\.(?:js|mjs|cjs|map)$/;
+    try {
+      fs.cpSync(ROOT, snapshot, {
+        recursive: true,
+        filter(src) {
+          const rel = path.relative(ROOT, src);
+          if (rel === '') return true;
+          const top = rel.split(path.sep)[0];
+          if (top === 'node_modules' || top === '.git') return false;
+          return !transient.test(path.basename(src));
+        },
+      });
+      // Single fixed command string (no interpolated input): safe with shell.
+      const r = spawnSync('npm pack --dry-run --json', {
+        encoding: 'utf8',
+        cwd: snapshot,
+        shell: true,
+      });
+      assert.equal(r.status, 0, r.stderr);
+      const parsed = JSON.parse(r.stdout);
+      const files = (parsed[0] && parsed[0].files || parsed.files || []).map((f) => f.path || f);
+      const names = files.map(String);
+      for (const want of [
+        'src/index.js',
+        'src/index.d.ts',
+        'src/lexer.js',
+        'src/numerals.js',
+        'src/sourcemap.js',
+        'src/watch.js',
+        'src/runtime.js',
+        'src/runtime.d.ts',
+        'src/register.js',
+        'bin/tamilscript.js',
+        'package.json',
+        'README.md',
+        'CHANGELOG.md',
+        'MIGRATION.md',
+        'LICENSE',
+        'examples/basic.js',
+        'examples/print-explicit.js',
+        'examples/commonjs/main.js',
+        'examples/esm/main.js',
+      ]) {
+        assert.ok(names.includes(want), `tarball missing ${want}; got ${names.join(', ')}`);
+      }
+      assert.ok(!names.some((n) => n.startsWith('test/')), 'dev tests must not ship');
+      assert.ok(!names.some((n) => n.startsWith('bench/')), 'bench must not ship');
+      assert.ok(!names.some((n) => n.startsWith('audit-tmp/')), 'audit scratch files must not ship');
+      assert.ok(!names.some((n) => n.startsWith('vscode-extension/')), 'extension sources must not ship');
+      assert.ok(!names.includes('bin/jstamil.js'), 'removed jstamil alias must not ship');
+      assert.ok(!names.includes('bin/opentamizh.js'), 'old opentamizh alias must not ship');
+    } finally {
+      fs.rmSync(snapshot, { recursive: true, force: true });
     }
-    assert.ok(!names.some((n) => n.startsWith('test/')), 'dev tests must not ship');
-    assert.ok(!names.some((n) => n.startsWith('bench/')), 'bench must not ship');
-    assert.ok(!names.includes('bin/jstamil.js'), 'removed jstamil alias must not ship');
-    assert.ok(!names.includes('bin/opentamizh.js'), 'old opentamizh alias must not ship');
   });
 });

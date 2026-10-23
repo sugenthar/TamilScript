@@ -202,9 +202,12 @@ describe('edge: API validation and declarations', () => {
     assert.match(dts, /extraArgs\?: string\[\]/, 'runFile options gap');
     assert.match(dts, /nodeFlags\?: string\[\]/, 'runFile nodeFlags gap');
   });
-  it('package declares zero runtime dependencies', () => {
+  it('package declares only the parser dependency needed for syntax validation', () => {
     const pkg = require('../package.json');
-    assert.equal(pkg.dependencies, undefined);
+    // Acorn is deliberately the only runtime dependency: it provides
+    // parser-backed diagnostics without evaluating user code and has no
+    // transitive dependencies of its own.
+    assert.deepEqual(Object.keys(pkg.dependencies || {}), ['acorn']);
     assert.equal(pkg.optionalDependencies, undefined);
     assert.equal(pkg.peerDependencies, undefined);
     assert.equal(pkg.name, 'tamilscript');

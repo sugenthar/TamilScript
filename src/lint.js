@@ -129,9 +129,11 @@ async function checkTransformedSyntax(code, absPath, positions) {
 /**
  * Lint one file.
  * @param {string} absPath absolute path
+ * @param {{ tamilKeywords?: boolean }} [options]
  * @returns {Promise<{ file: string, problems: Array }>}
  */
-async function lintFile(absPath) {
+async function lintFile(absPath, options) {
+  const opts = options || {};
   let source;
   try {
     source = await fs.promises.readFile(absPath, 'utf8');
@@ -154,7 +156,13 @@ async function lintFile(absPath) {
   let code;
   let positions;
   try {
-    const first = transformWithMap(source, { filename: absPath });
+    // Keyword mode is opt-in for every command, including lint. The .ot.js
+    // suffix selects the editor language mode; it does not enable keyword
+    // rewriting by itself (docs/SYNTAX.md, docs/CLI.md).
+    const first = transformWithMap(source, {
+      filename: absPath,
+      tamilKeywords: !!opts.tamilKeywords,
+    });
     code = first.code;
     positions = first.positions;
   } catch (err) {
@@ -206,7 +214,7 @@ async function collectJsFiles(dir) {
 /**
  * Lint a file or a directory tree.
  * @param {string} targetAbs absolute path (caller checked existence)
- * @param {{ isDirectory?: boolean }} [options]
+ * @param {{ isDirectory?: boolean, tamilKeywords?: boolean }} [options]
  * @returns {Promise<{ scanned: number, problems: Array }>}
  */
 async function lintPath(targetAbs, options) {
@@ -214,7 +222,7 @@ async function lintPath(targetAbs, options) {
   const files = opts.isDirectory ? await collectJsFiles(targetAbs) : [targetAbs];
   const problems = [];
   for (const file of files) {
-    const result = await lintFile(file);
+    const result = await lintFile(file, { tamilKeywords: !!opts.tamilKeywords });
     for (const p of result.problems) {
       problems.push(Object.assign({ file }, p));
     }

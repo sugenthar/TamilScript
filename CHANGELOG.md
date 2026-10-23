@@ -1,12 +1,15 @@
 # Changelog
 
 > **Rename:** the project and npm package were renamed from **OpenTamizh** /
-> `opentamizh` to **TamilScript** / `tamilscript`. Entries below are retained
-> as they were written at the time of each change, so old command names and
-> package imports in this file are historical. Current names and compatibility
-> details are in [MIGRATION.md](MIGRATION.md).
+> `opentamizh` to **TamilScript** / `tamilscript`. TamilScript release entries
+> use the current names. The pre-rename OpenTamizh development milestones are
+> grouped at the bottom and retain their original names and versions.
+> Compatibility details are in [MIGRATION.md](MIGRATION.md).
 
-## Unreleased
+## 0.2.0 — 2026-10-23
+
+This is the TamilScript 0.2.0 release candidate. It is not published until a
+maintainer approves it.
 
 **Breaking (syntax): `$` is reserved for Tamil numeric literals.**
 `$"..."` / `$'...'` string literals were removed. Write ordinary JavaScript
@@ -19,6 +22,44 @@ template literal text is still never interpreted. Everything else below is
 a backward-compatible CLI and diagnostics upgrade; other commands, flags,
 output formats, and exit codes are preserved.
 
+- **Opt-in Tamil keywords**: `--tamil-keywords`,
+  `TAMILSCRIPT_KEYWORDS=1`, `{ tamilKeywords: true }`, and
+  `tamilscript.tamilKeywords` enable aliases such as `என்றால்` → `if`,
+  `செயல்` → `function`, `கொடு` → `return`, and `வகுப்பு` → `class`.
+  The mode is off by default, so ordinary Tamil identifiers and default
+  output are unchanged. Implemented words are reserved only in this mode;
+  property names after `.`/`#`, object keys, and ordinary class/object
+  member names keep their Tamil spelling. The registry is authoritative in
+  `src/keywords/definitions.js`. Seven proposed words remain explicitly
+  deferred because they need type/class/module grammar.
+- **Inclusive Tamil ranges**: `$௧..$௫` becomes an ordinary
+  ascending array expression. Endpoints are inclusive; decimal, mixed,
+  descending, glued, or unsafe forms are diagnosed; a 100,000-element cap
+  prevents typo-driven allocation. The expansion is self-contained and does
+  not resolve a shadowable global `Array` binding. Ranges need no keyword
+  opt-in.
+- **Release review fixes**: `உருவாக்கு` is rewritten only as
+  a bare class constructor; object methods, modified class methods
+  (`static`/`async`/accessor/generator), and class fields keep their Tamil
+  spelling. The range expansion is self-contained, so a local `Array` binding
+  cannot change the result.
+- **Parser-backed `validate()`**: new root API returns
+  `{ ok, code }` or `{ ok, diagnostic }` without executing. Lexical `JST_*`
+  codes are preserved; invalid generated JavaScript uses
+  `JST_JAVASCRIPT_SYNTAX`; locations map back through keyword/range numerics.
+  Acorn is the single runtime dependency (parser only, not a type checker).
+- **Explicit runtime helpers**: `சேர்`, `நீளம்`, `எண்`, and
+  `சொல்` are exported from `tamilscript/runtime`, with matching TypeScript
+  declarations. They are not keywords or globals and are not added to the
+  root export surface.
+- **VS Code keyword mode**: `tamilscript.tamilKeywords` defaults
+  to `false` and is passed to validation/transform; the bridge prefers
+  `api.validate()` and falls back to transform for older core versions.
+- **Diagnostics and docs corrections**: document the audited
+  `tamilscript@0.1.0` registry baseline and the 0.2.0 release-candidate state,
+  document Acorn, and align syntax/API/CLI/migration docs and tests with
+  actual behavior.
+
 - **New CLI commands**:
   - `init [directory] [--force]` — scaffolds a starter project
     (`package.json`, `README.md`, `src/app.ot.js`, `test/app.test.js`)
@@ -28,7 +69,7 @@ output formats, and exit codes are preserved.
   - `test` — runs the project's npm `test` script with output and exit-code
     passthrough, clear configuration errors, and recursion protection.
   - `doctor` — reports the local Node.js/npm setup, the CLI entry, the
-    opentamizh installation, `package.json` validity, and files referenced
+    tamilscript installation, `package.json` validity, and files referenced
     by npm scripts. Local-only: no network, registry, or integrity checks.
 - **Tamil-aware diagnostics**: CLI failures now carry a category
   (`usage` / `file` / `validation` / `config` / `runtime`), preserve the
@@ -62,13 +103,14 @@ output formats, and exit codes are preserved.
   still selects ESM. `--watch` watches directories filtered to the tracked
   file names, so editor atomic saves, deletions, and recreations keep
   triggering reruns.
-- **Tamil output mode**: `--tamil` (or `OPENTAMIZH_LANG=tamil`) translates
+- **Tamil output mode**: `--tamil` (or `TAMILSCRIPT_LANG=tamil`; the legacy
+  `OPENTAMIZH_LANG` value is still read) translates
   the fixed CLI labels and categories using a tested catalogue; messages,
   paths, codes, hints, help, and stack traces stay English.
 - **Safer CLI ergonomics**: directories passed to `run`/`check`/`transform`
   where a file is required are rejected up front with exit `1`; usage errors
   still exit `2`, runtime/program exit codes are untouched.
-- **Interactive REPL** (`opentamizh repl`): expressions and statements run
+- **Interactive REPL** (`tamilscript repl`): expressions and statements run
   through the same core transformer on the same Node.js engine via
   `node:vm` — no `eval`, no second JavaScript engine. Variables persist,
   multiline input works (templates, block comments, unbalanced brackets),
@@ -82,7 +124,7 @@ output formats, and exit codes are preserved.
   child process (before the file or `--`; default `127.0.0.1:9229`, port
   `0` = random). Inline source maps keep debugger positions and stack
   traces on the original files; `--watch` composes with both flags.
-- **Conservative formatter** (`opentamizh format <file> [--check]`):
+- **Conservative formatter** (`tamilscript format <file> [--check]`):
   removes trailing spaces/tabs/`\v`/`\f` outside lexer-recorded protected
   spans, empties whitespace-only lines, and adds a missing final line break
   (CRLF preserved). Never touches strings, templates, comments, regexes, or
@@ -90,15 +132,15 @@ output formats, and exit codes are preserved.
   `--check` reports without writing (exit `1` when a change is needed). It
   is deliberately not a pretty-printer — re-indent/re-wrap need a parser
   and are documented as out of scope.
-- **High-confidence linter** (`opentamizh lint <file-or-directory>`):
-  `OT001` malformed/unsupported OpenTamizh literal (with `JST_*` code and
+- **High-confidence linter** (`tamilscript lint <file-or-directory>`):
+  `OT001` malformed/unsupported TamilScript literal (with `JST_*` code and
   hint), `OT002` JavaScript syntax error in the transformed output via
   `node --check` (a separate `javascript-syntax` category so the two are
   never mixed), `OT000` unreadable file. `file:line:column` output, at most
   one problem per file (the first), recursive directory scans that skip
   `node_modules`/`.git` and never follow symlinks, temporary check files
   always removed. Never executes or writes user files.
-- **VS Code run command** (`opentamizh.runFile`, "OpenTamizh: Run Current
+- **VS Code run command** (`tamilscript.runFile`, "TamilScript: Run Current
   File"): resolves the core CLI (setting, workspace `node_modules`, then
   the sibling checkout) and types `node <cli> run <file>` into an
   integrated terminal rooted at the file's directory. Saves unsaved
@@ -118,11 +160,11 @@ output formats, and exit codes are preserved.
   program output through pipes and captured test runs; numeric output now
   stays byte-exact. `console.log()` behavior on a real terminal is
   unchanged.
-- **Standalone transform output**: `opentamizh transform` (both `-o` and
+- **Standalone transform output**: `tamilscript transform` (both `-o` and
   `--stdout`, including `--explain`/`--source-map`) and `transformFile()`
   prepend a small inlined runtime prelude when the source mentions the
   Tamil print helper, so the transformed file runs under plain `node` with
-  no installed `opentamizh` package and no manual import. The prelude
+  no installed `tamilscript` package and no manual import. The prelude
   installs the same global `run` installs (never overwriting one), keeps a
   leading hashbang and `"use strict"` directive intact, uses no
   `require`/`import` (CommonJS and ESM outputs both work), and external
@@ -132,18 +174,25 @@ output formats, and exit codes are preserved.
 
 ## 0.1.0 — 2026-10-13
 
-Initial public release on npm. This is the first version published to the
-registry; no prior version was ever published. It contains the complete
-Tamil-first feature set developed through 0.6.0: Tamil identifiers,
-`$`-prefixed Tamil integer/decimal/string literals, the `அச்சிடு()` print
-helper (automatic via `opentamizh run`, explicit via `opentamizh/runtime`),
-`transform`/`run`/`check` CLI plus `--watch`, ESM/CommonJS support, inline
-and external source maps, and the VS Code extension (unpublished side-load).
-Zero runtime dependencies; Node.js >= 18 (automatic helper registration
-needs 18.19+ or 20.6+; older supported versions use the explicit import).
-The 0.2.0–0.6.0 entries below are development history, not past releases.
+Initial public release under the TamilScript name. This is the first version
+published to the registry; no prior TamilScript version was ever published.
+It contains the complete Tamil-first feature set developed through the
+OpenTamizh 0.6.0 milestone: Tamil identifiers, `$`-prefixed Tamil
+integer/decimal/string literals, the `அச்சிடு()` print helper (automatic via
+`tamilscript run`, explicit via `tamilscript/runtime`), `transform`/`run`/
+`check` CLI plus `--watch`, ESM/CommonJS support, inline and external source
+maps, and the VS Code extension (unpublished side-load). Zero runtime
+dependencies; Node.js >= 18 (automatic helper registration needs 18.19+ or
+20.6+; older supported versions use the explicit import).
 
-## 0.6.0
+## OpenTamizh pre-rename development history
+
+These entries are preserved from before the rename. They use the original
+OpenTamizh version numbers and command names and were not published as
+TamilScript releases. The TamilScript 0.2.0 release-candidate entry is at the
+top of this file.
+
+### OpenTamizh 0.6.0
 
 Editor experience and verification upgrade on top of 0.5.0. No syntax
 changes, no existing API changes, no new Tamil helpers. Core transformer,
@@ -183,7 +232,7 @@ lexer, and runtime untouched.
   for the session, file contents are never touched, and
   `opentamizh.autoLanguageMode: false` restores the previous behavior.
 
-## 0.5.0
+### OpenTamizh 0.5.0
 
 Beginner-focused usability upgrade on top of 0.4.0. No syntax changes, no
 existing API changes, no new Tamil helpers; the `jstamil` CLI remains as a
@@ -202,7 +251,7 @@ legacy alias.
 - **CLI guidance**: `run --help` now mentions automatic Tamil print helper
   setup, the Node.js version floor, and the explicit-import alternative.
 
-## 0.4.0
+### OpenTamizh 0.4.0
 
 New capability on top of the 0.3.0 package identity. No syntax changes; no
 existing API renames; the `jstamil` CLI remains as a legacy alias.
@@ -223,7 +272,7 @@ existing API renames; the `jstamil` CLI remains as a legacy alias.
   cleanup) instead of a bare `ReferenceError`. The explicit import works on
   every supported Node version. Zero runtime dependencies retained.
 
-## 0.3.0
+### OpenTamizh 0.3.0
 
 Upgrade from the JsTamil-derived `opentamizh` 0.2.0 package identity. No syntax
 changes; no public API renames; the `jstamil` CLI remains as a legacy alias.
@@ -252,7 +301,7 @@ changes; no public API renames; the `jstamil` CLI remains as a legacy alias.
   debris tests, declaration and zero-dependency assertions; CI also runs
   `npm pack --dry-run`. Zero runtime dependencies retained.
 
-## 0.2.0
+### OpenTamizh 0.2.0
 
 JsTamil-derived baseline: Tamil integer/decimal/string literals, safe-integer
 validation, ESM/CommonJS `run` with nested relative dependencies, inline and

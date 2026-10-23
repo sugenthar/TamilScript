@@ -126,6 +126,93 @@ describe('lint: lintFile / lintPath', () => {
     assert.deepEqual(result.problems, []);
   });
 
+  it('preserves module semantics for .cjs files', async () => {
+    const file = write('api/commonjs.cjs', 'module.exports = $௨;\n');
+    const result = await lintFile(file);
+    assert.deepEqual(result.problems, []);
+  });
+
+  it('honors package.json type module for .js files', async () => {
+    write('api/pkg-module/package.json', JSON.stringify({ type: 'module' }));
+    const file = write('api/pkg-module/esm.js', 'export const n = $௩;\n');
+    const result = await lintFile(file);
+    assert.deepEqual(result.problems, []);
+  });
+
+  it('honors package.json type commonjs for .js files', async () => {
+    write('api/pkg-commonjs/package.json', JSON.stringify({ type: 'commonjs' }));
+    const file = write('api/pkg-commonjs/cjs.js', 'module.exports = $௪;\n');
+    const result = await lintFile(file);
+    assert.deepEqual(result.problems, []);
+  });
+
+  it('reports genuine OT002 for ESM syntax in a CommonJS-typed .js file', async () => {
+    write('api/pkg-commonjs-bad/package.json', JSON.stringify({ type: 'commonjs' }));
+    const file = write('api/pkg-commonjs-bad/esm.js', 'export const n = $௫;\n');
+    const result = await lintFile(file);
+    assert.equal(result.problems.length, 1);
+    assert.equal(result.problems[0].rule, 'OT002');
+  });
+
+  // Regression test for Finding D: a package-less .js file using top-level
+  // import/export is valid ESM and must not receive a false OT002. The
+  // tempExtensionFor() fallback sniffs it as .mjs.
+  it('does not false-positive OT002 for a package-less .js file using top-level import/export', async () => {
+    const file = write('api/esm-in-cjs-ctx.js', 'export const n = $௩;\n');
+    const result = await lintFile(file);
+    assert.deepEqual(result.problems, [], 'ESM .js file should not produce OT002');
+  });
+
+  it('does not false-positive OT002 for a package-less .ot.js file using top-level export', async () => {
+    const file = write('api/esm.ot.js', 'export const n = $௩;\n');
+    const result = await lintFile(file);
+    assert.deepEqual(result.problems, []);
+  });
+
+  it('reports OT002 for genuinely invalid .mjs and .cjs syntax', async () => {
+    const mjs = write('api/invalid.mjs', 'export const n = ;\n');
+    const mjsResult = await lintFile(mjs);
+    assert.equal(mjsResult.problems.length, 1);
+    assert.equal(mjsResult.problems[0].rule, 'OT002');
+
+    const cjs = write('api/invalid.cjs', 'let n = ;\n');
+    const cjsResult = await lintFile(cjs);
+    assert.equal(cjsResult.problems.length, 1);
+    assert.equal(cjsResult.problems[0].rule, 'OT002');
+  });
+
+  // Finding E: .ot.js selects the editor language mode, not Tamil keyword
+  // mode. Keyword rewriting stays opt-in for every command (docs/SYNTAX.md,
+  // docs/CLI.md), so the linter must not silently reinterpret identifiers.
+  it('does not implicitly enable Tamil keyword mode for .ot.js files', async () => {
+    const file = write('api/prog.ot.js', "'use strict';\nசெயல் வர்க்கம்(n) { கொடு n * n; }\n");
+    const result = await lintFile(file);
+    assert.equal(result.problems.length, 1);
+    assert.equal(result.problems[0].rule, 'OT002');
+  });
+
+  it('enables Tamil keyword mode for .ot.js files only when requested', async () => {
+    const file = write('api/prog-keywords.ot.js', "'use strict';\nசெயல் வர்க்கம்(n) { கொடு n * n; }\n");
+    const result = await lintFile(file, { tamilKeywords: true });
+    assert.deepEqual(result.problems, []);
+  });
+
+  it('keeps registered Tamil words valid identifiers by default', async () => {
+    const file = write('api/keyword-identifier.ot.js', 'const செயல் = $௧;\nconsole.log(செயல்);\n');
+    const result = await lintFile(file);
+    assert.deepEqual(result.problems, []);
+  });
+
+  it('propagates tamilKeywords through a directory scan', async () => {
+    const dir = path.join(workdir, 'api', 'keyword-dir');
+    write('api/keyword-dir/a.ot.js', 'செயல் வர்க்கம்(n) { கொடு n * n; }\n');
+    const off = await lintPath(dir, { isDirectory: true });
+    assert.equal(off.problems.length, 1);
+    assert.equal(off.problems[0].rule, 'OT002');
+    const on = await lintPath(dir, { isDirectory: true, tamilKeywords: true });
+    assert.deepEqual(on.problems, []);
+  });
+
   it('checks an explicitly named non-JS file as given', async () => {
     const file = write('api/weird.txt', BAD_LITERAL_SOURCE);
     const result = await lintPath(file, { isDirectory: false });
@@ -224,6 +311,17 @@ describe('lint: CLI', () => {
     assert.equal(r.status, 0, r.stderr);
     assert.match(r.stdout, /No lint problems found \(1 file scanned\)\./);
     assert.equal(fs.readFileSync(file, 'utf8'), GOOD_SOURCE, 'lint never writes');
+  });
+
+  it('keeps Tamil keyword mode opt-in for .ot.js files', () => {
+    const file = write('cli/prog.ot.js', 'செயல் வர்க்கம்(n) { கொடு n * n; }\n');
+    const without = cli(['lint', file]);
+    assert.equal(without.status, 1);
+    assert.match(without.stdout, /\[OT002\]/);
+
+    const withFlag = cli(['--tamil-keywords', 'lint', file]);
+    assert.equal(withFlag.status, 0, withFlag.stderr);
+    assert.match(withFlag.stdout, /No lint problems found \(1 file scanned\)\./);
   });
 
   it('uses the Tamil hint label with --tamil', () => {

@@ -159,7 +159,7 @@ describe('print helper: module surface', () => {
       'transform', 'transformWithMap', 'transformWithMeta', 'transformFile',
       'runFile', 'checkFile', 'inlineSourceMapComment', 'errors', 'ErrorCodes',
       'formatDiagnostic', 'JsTamilError', 'JsTamilSyntaxError',
-      'TamilScriptError', 'TamilScriptSyntaxError', 'VERSION',
+      'TamilScriptError', 'TamilScriptSyntaxError', 'VERSION', 'validate',
       PRINT,
     ].sort();
     assert.deepEqual(names, expected);

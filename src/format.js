@@ -58,14 +58,17 @@ function isTrimChar(ch) {
  * @throws {import('./errors').JsTamilSyntaxError} when the source does not
  *   transform (unsupported or malformed TamilScript)
  */
-function formatSource(source) {
+function formatSource(source, options) {
   if (typeof source !== 'string') {
     throw new TypeError(`formatSource() expects source as a string, got ${typeof source}`);
   }
   if (source.length === 0) return source;
   // Running the scanner both validates the input and records the protected
   // spans; a failure here means the file must not be rewritten at all.
-  const scanner = new Scanner(source, { collectSpans: true });
+  const scanner = new Scanner(source, {
+    collectSpans: true,
+    tamilKeywords: !!(options && options.tamilKeywords),
+  });
   scanner.run();
   const spans = mergeSpans(scanner.spans);
 
